@@ -1,0 +1,228 @@
+---
+title: "Surveys"
+author: "David Keith"
+date: "12/16/2021"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE,echo=F, message=F,warning=F}
+knitr::opts_chunk$set(echo = TRUE)
+
+# First up we will check your r packages and install anything you need for this for you.
+
+req.packages <- c("tidyverse","lubridate","plotly","sf","sp","data.table","units","cowplot","knitr",'concaveman','ggthemes',"nngeo","marmap",
+                	"ggplot2","stars","tmaptools","rnaturalearth","rnaturalearthdata","raster","rgdal","RStoolbox","pals","ggnewscale","ggspatial",'devtools','rlist')
+# If you don't have the packages install them + give a heads up that you are
+new.packages <- req.packages[!(req.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)>0) 
+{
+  cat(paste0("Heads up, I have to install these packages for this to work:", new.packages ))
+  #wanna.install <- readline(prompt = "If you want to install these package(s) enter 'y': ")
+  #if(tolower(wanna.install) == 'y') 
+  install.packages(new.packages,repos = "http://cran.us.r-project.org") #else { stop("You didn't want to install the packages so this script does not work.")}
+}
+
+# You also need to install this github repo package if you do not have it.
+hi.res <- any(installed.packages()[,"Package"] %in% "rnaturalearthhires")
+if(hi.res == F) devtools::install_github("https://github.com/ropensci/rnaturalearthhires/")
+  
+
+# The libraries that we will use directly in this code
+library(knitr)
+library(ggplot2)
+library(gridExtra)
+library(reshape2)
+library(scales)
+library(cowplot)
+require(tidyverse)
+require(dplyr)
+require(tidyr)
+
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+# Set the Workding directory.
+direct.proj <- "D:/Github/Fisheries_module/"
+
+#Some Custom Functions I'll need
+funs <- c("https://raw.githubusercontent.com/Mar-Scal/Assessment_fns/master/Maps/pectinid_projector_sf.R",
+          "https://raw.githubusercontent.com/Mar-scal/Assessment_fns/master/Maps/centre_of_gravity.R",
+          "https://raw.githubusercontent.com/Mar-scal/Assessment_fns/master/Maps/add_alpha_function.R",
+          "https://raw.githubusercontent.com/Mar-scal/Assessment_fns/master/Maps/convert_coords.R")
+# Now run through a quick loop to load each one, just be sure that your working directory is read/write!
+for(fun in funs) 
+{
+  download.file(fun,destfile = basename(fun))
+  source(paste0(getwd(),"/",basename(fun)))
+  file.remove(paste0(getwd(),"/",basename(fun)))
+}
+
+# A couple custom functions I may or may not use
+factor.2.number <- function(x) {as.numeric(levels(x))[x]} # My friend factor.2.number
+# Function in case you need it for transforming propotion data to not have 0's and 1's.  
+beta.transform <- function(dat,s=0.5)  (dat*(length(dat)-1) + s) / length(dat)
+# Cute little function to divide split something up by a weighting factor.
+nsplit = function(X,n)
+{
+  p = X/sum(X)
+  diff(round(n*cumsum(c(0,p))))
+}
+
+
+# Now I want to make a bounding box that outlines our study area
+survey.domain <- st_as_sf(data.frame(X = c( 465000, 750000, 750000, 650000, 600000, 400000),
+                                    Y = c(4450000,4450000,4710000,4900000,4860000,4800000),ID=1),coords = c("X","Y"),crs= 32619)
+# Transform it to proper units
+survey.domain <- st_transform(survey.domain,crs = 4326)
+# And convert it from some points into a polygon object
+survey.domain <- st_cast(st_combine(survey.domain),"POLYGON")
+
+base.plt <- pecjector(area="GOM",repo = 'github', plot=F,
+                      add_layer = list(land ='grey',nafo = 'sub',scale.bar = 'tl',bathy = c(10,'s',250)),
+                      add_custom = list(obj = survey.domain,fill=NA,size=2,color='darkgreen'))
+
+base.no.bathy <- pecjector(area="GOM",repo = 'github', plot=F,
+                      add_layer = list(land ='grey',nafo = 'sub',scale.bar = 'tl'),
+                      add_custom = list(obj = survey.domain,fill=NA,size=2,color='darkgreen'))
+
+# Lets grab the NAFO subareas that are going to form our survey domain, I'll need to tweak a few of them to cut off to the south of GB
+# Figure out where your tempfiles are stored
+temp <- tempfile()
+# Download this to the temp directory you created above
+download.file("https://raw.githubusercontent.com/Mar-scal/GIS_layers/master/NAFO/Subareas.zip", temp, quiet=T)
+# Figure out what this file was saved as
+temp2 <- tempfile()
+# Unzip it
+unzip(zipfile=temp, exdir=temp2)
+# This pulls in all the layers from the above location
+nafo <- combo.shp(temp2,make.sf=T, quiet=T)
+nafo <- st_make_valid(nafo)
+# Now clip the nafo strata into our made up survey domain
+nafo.strata <- st_intersection(nafo,survey.domain)
+nafo.strata
+# Two of the strata kinda suck, id 125, 135, 141, and 142 are going to go as they aren't unique subareas.
+nafo.strata <- nafo.strata %>% dplyr::filter(!id %in% c(125,135,141,142))
+# Calculate the total area and the area by strata
+nafo.strata$area <- st_area(nafo.strata) %>% units::set_units("km^2") %>% as.numeric()
+tot.area <- sum(nafo.strata$area) # This gets the same number as using st_area(survey.domain) so this is the total area of the survey domain
+# Now we calculate the proportion of the total area that each strata covers
+nafo.strata$p.area <-nafo.strata$area/tot.area
+```
+
+
+<!-- Here we are setting the parameters for our modelling -->
+
+```{r survey-parameters, echo=T}
+# We can set the number of stations...
+n.stations <- 200
+
+
+```
+
+
+
+
+## Survey Simulation
+
+Here we get into the simulation pieces we need to compare models.  For example, we can have `r n.stations` that are randomly allocated across our survey domain
+
+```{r survey-simulate, include=FALSE}
+
+rand.samp <- st_sample(survey.domain,size = n.stations)
+
+rand.plt <- base.plt + geom_sf(data = rand.samp)
+rand.plt
+```
+
+But we could also have it to be stratified by the NAFO subarea too
+
+
+```{r survey-stratified-area, include = F}
+
+nafo.strata$stations <- nsplit(nafo.strata$p.area, n.stations) 
+
+# Grab samples, get a new ID field and combine back with the data in the nafo strata object
+strata.samp <- st_sample(nafo.strata, size = nafo.strata$stations,type = 'random', exact = T) %>%
+                        st_sf('ID' = seq(length(.)), 'geometry' = .) %>%
+                        st_intersection(., nafo.strata)
+
+
+strat.plt <- base.plt + geom_sf(data = strata.samp)
+strat.plt
+
+```
+
+
+Lots of other things you can stratify on as well, a classic is to stratify by depth, we can do that by using the bathymetry that we have in the above plots
+ which is completely free to download  
+
+
+```{r survey-stratified-depth, include = F}
+
+bathy.org <- getNOAA.bathy(lon1 = -72 ,lon2 = 65,lat1 = 40,lat2=44.5,resolution =1)
+bathy <- marmap::as.raster(bathy.org)
+b.box <- st_bbox(survey.domain)
+# Now clip this to the bounding area, note that the bathy is basically a EPSG:4326 so we need to crop it accordingly and transform our b.box to this...
+bathy.s <- crop(bathy,b.box)
+bathy.st <- st_as_stars(bathy.s)
+bathy.poly <- st_as_sf(bathy.st)
+# Make anything > 0 = 0, and anything < 250 = 250.  Our species won't go below 250 meters depth nor is it an amphibian
+bathy.poly$layer[bathy.poly$layer > 0] <- 0
+bathy.poly$layer[bathy.poly$layer < -250] <- -250
+    
+# Now we can simplify the object further so there isn't a polygon for every 1 meter difference, here we lump things into some nicer bins 
+bathy.poly$layer[bathy.poly$layer > -9] <- -5 # Make everything negative but less than 10 meters 5 meters
+bathy.poly$layer[bathy.poly$layer >-100 & bathy.poly$layer < -10] <- signif(bathy.poly$layer[bathy.poly$layer >-100 & bathy.poly$layer < -10],digits=1)
+bathy.poly$layer[bathy.poly$layer < -100 ] <- signif(bathy.poly$layer[bathy.poly$layer < -100 ],digits=2)
+# Now make a multi with each 10 meter depth strata a multipolygon object
+depth.strata <- aggregate(bathy.poly, list(bathy.poly$layer), function(x) x[1])
+# and now clip this to our survey domain (again, last time we used a raster bounding box to trim down, now we really clip it properly)
+depth.strata <- st_intersection(depth.strata,survey.domain)
+# And calculate the area of each bathy strata
+depth.strata$area <- st_area(depth.strata) %>% units::set_units("km^2") %>% as.numeric()
+tot.area.bathy <- sum(depth.strata$area) # It is within 3 km^2 of the survey domain, I'll take that!
+depth.strata$p.area <- depth.strata$area /tot.area.bathy
+# Now we can plot this new bathymetry
+p <- base.no.bathy + geom_sf(data = depth.strata,aes(fill = layer,color=layer))
+save_plot("D:/Github/Fisheries_module/Simplified_bathy.png",p,base_width = 10,base_height = 10)
+
+# And now we are ready to take next step and we can try and stratify the survey by depth
+depth.strata$stations <-  nsplit(depth.strata$p.area, n.stations) 
+
+depth.samp <- st_sample(depth.strata, size = depth.strata$stations,type = 'random', exact = T) %>%
+                        st_sf('ID' = seq(length(.)), 'geometry' = .) %>%
+                        st_intersection(., depth.strata)
+
+p2 <- base.no.bathy + geom_sf(data = depth.strata,aes(fill = layer,color=layer)) + geom_sf(data =depth.samp,color='white')
+save_plot("D:/Github/Fisheries_module/depth_strata_sample_stations.png",p2,base_width = 10,base_height = 10)
+
+
+```
+
+So at this point we have a survey where we have no stratification, a survey stratified by NAFO area, and a survey that is stratified on depth.  Next up I need to make up some biomass distributions, we can distribute biomass randomly, within the NAFO areas, by depth, and maybe some other weird way.  
+
+I think to do this I'm gonna need to carve up the area into grids, that will let me do the random way and some other non-random way of doing it. I think the nafo and depth areas are my way in to splitting up the biomass in those (I think I'll probably need to go back to the bathy polygons to pull that off). Going to need to make each polygon kinda a biomass field aren't I, then we land a sample somewhere in that field to get estimate.  Lazy way would be to make each polygon have identical biomass everywhere (maybe that's the easy way) then we can make it more complex from there.
+
+## The Survey
+
+Here we set up the background for the survey, we're going to go out and do a survey in the Gulf of Maine (GOM) .
+
+
+
+```{r over-plt,echo=F,message=F,warning = F,fig.width = 6, fig.height=8, fig.cap = "The Gulf of Maine (GOM) ecosystem, the red line inidates the *border* between Canada and the U.S.A. The thin black lines indicate the North Atlantic Fisheries Organization (NAFO) fishery polygons."}
+bp.bathy <-  pecjector(area="GOM",plot=F,repo = 'github',
+                       add_layer = list(land ='grey',nafo = 'sub',scale.bar = 'tl',bathy = c(10,'s',200)),
+                       c_sys = 32619,buffer = 0.2) + theme_map()
+bp.bathy
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
