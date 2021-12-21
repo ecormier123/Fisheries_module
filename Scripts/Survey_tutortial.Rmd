@@ -1,18 +1,54 @@
 ---
-title: "Surveys"
-author: "David Keith"
-date: "12/16/2021"
+title: "Survey Simulation Example"
+author: "Eura Nama"
 output:
-  word_document: default
-  pdf_document: default
+  # bookdown::word_document2:
+  #   fig_caption: yes
+  #   number_sections: false
+  # fontsize: 12pt
+  # sansfont: Liberation Sans
+  # mainfont: Liberation Sans
+  # classoption: twocolumn
+  # language: english
+  #bookdown::html_document2: default
+  bookdown::pdf_document2:
+      keep_tex: yes
+      number_sections: false
+      toc: no
+      # includes:
+      # in_header: "styling.sty"
+  language: english
+  classoption: twocolumn
+header-includes: 
+  - \usepackage{tikz} \usepackage{pdflscape} \usepackage{float}
+  - \newcommand{\blandscape}{\begin{landscape}}
+  - \newcommand{\elandscape}{\end{landscape}}
 ---
 
-```{r setup, include=FALSE,echo=F, message=F,warning=F}
-knitr::opts_chunk$set(echo = TRUE)
+
+
+<!-- Here we are setting the parameters for our modelling -->
+
+```{r survey-parameters, echo=F}
+options(scipen = 999) # Just forces numbers to not be in scientific notiation
+# We can set the number of stations...
+n.stations <- 20
+tot.biomass <- 100000 # Could be any units, let's call it tonnes, and because of how I have this set up below this number isn't exact
+catchability <- 0.3 # What proportion of the population does survey tend to catch, going to fix this at 0.3 for simplicity
+area.swept <-  10000    # What is the area swept of each tow, we'll assume it is identical, this would be a 2 km run with 5 meter wide gear.  
+                                  # somewhere in the 1000's of square meters tends to make sense here for trawl kinds of gear.  Also need to convert to km²
+n.sims <- 4
+bm.dist <- c("Random","NAFO","Depth") 
+# Which Biomass distribution do you want [1] will be Random Survey, 2 will be NAFO survey, and 3 will be "Depth
+bm.dist <- bm.dist[2]
+
+
+```
+
+```{r setup, include=FALSE,echo=F, message=F,warning=F,cache=F}
 
 # First up we will check your r packages and install anything you need for this for you.
-
-req.packages <- c("tidyverse","lubridate","plotly","sf","sp","data.table","units","cowplot","knitr",'concaveman','ggthemes',"nngeo","marmap",
+req.packages <- c("tidyverse","lubridate","plotly","sf","sp","data.table","units","cowplot","knitr",'concaveman','ggthemes',"nngeo","marmap","RandomFields",
                 	"ggplot2","stars","tmaptools","rnaturalearth","rnaturalearthdata","raster","rgdal","RStoolbox","pals","ggnewscale","ggspatial",'devtools','rlist')
 # If you don't have the packages install them + give a heads up that you are
 new.packages <- req.packages[!(req.packages %in% installed.packages()[,"Package"])]
@@ -39,6 +75,11 @@ library(cowplot)
 require(tidyverse)
 require(dplyr)
 require(tidyr)
+library(RandomFields)
+library(sf)
+library(marmap)
+library(stars)
+library(raster)
 
 knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
 # Set the Workding directory.
@@ -48,6 +89,7 @@ direct.proj <- "D:/Github/Fisheries_module/"
 funs <- c("https://raw.githubusercontent.com/Mar-Scal/Assessment_fns/master/Maps/pectinid_projector_sf.R",
           "https://raw.githubusercontent.com/Mar-scal/Assessment_fns/master/Maps/centre_of_gravity.R",
           "https://raw.githubusercontent.com/Mar-scal/Assessment_fns/master/Maps/add_alpha_function.R",
+          "https://raw.githubusercontent.com/Mar-scal/Assessment_fns/master/Maps/combo_shp.R",
           "https://raw.githubusercontent.com/Mar-scal/Assessment_fns/master/Maps/convert_coords.R")
 # Now run through a quick loop to load each one, just be sure that your working directory is read/write!
 for(fun in funs) 
@@ -67,8 +109,10 @@ nsplit = function(X,n)
   p = X/sum(X)
   diff(round(n*cumsum(c(0,p))))
 }
+```
 
 
+```{r data-setup,echo=F, cache=T,include=F,message=F}
 # Now I want to make a bounding box that outlines our study area
 survey.domain <- st_as_sf(data.frame(X = c( 465000, 750000, 750000, 650000, 600000, 400000),
                                     Y = c(4450000,4450000,4710000,4900000,4860000,4800000),ID=1),coords = c("X","Y"),crs= 32619)
@@ -77,13 +121,13 @@ survey.domain <- st_transform(survey.domain,crs = 4326)
 # And convert it from some points into a polygon object
 survey.domain <- st_cast(st_combine(survey.domain),"POLYGON")
 
-base.plt <- pecjector(area="GOM",repo = 'github', plot=F,
-                      add_layer = list(land ='grey',nafo = 'sub',scale.bar = 'tl',bathy = c(10,'s',250)),
-                      add_custom = list(obj = survey.domain,fill=NA,size=2,color='darkgreen'))
+# Now we can carve up our survey domain into a bunch of grids, size is I believe 0.1 degrees, so 6 minutes each I think (10 per degree)
+survey.grid <- st_make_grid(survey.domain,cellsize = 0.1)
+# Then we clip that to the survey domain and we have some nice cells we can toss biomass into kinda almost anyway we'd like.
+survey.grid <- st_intersection(survey.grid,survey.domain)
+# Make this a nice sf object for later.
+survey.grid <- st_sf(survey.grid)
 
-base.no.bathy <- pecjector(area="GOM",repo = 'github', plot=F,
-                      add_layer = list(land ='grey',nafo = 'sub',scale.bar = 'tl'),
-                      add_custom = list(obj = survey.domain,fill=NA,size=2,color='darkgreen'))
 
 # Lets grab the NAFO subareas that are going to form our survey domain, I'll need to tweak a few of them to cut off to the south of GB
 # Figure out where your tempfiles are stored
@@ -107,57 +151,9 @@ nafo.strata$area <- st_area(nafo.strata) %>% units::set_units("km^2") %>% as.num
 tot.area <- sum(nafo.strata$area) # This gets the same number as using st_area(survey.domain) so this is the total area of the survey domain
 # Now we calculate the proportion of the total area that each strata covers
 nafo.strata$p.area <-nafo.strata$area/tot.area
-```
 
-
-<!-- Here we are setting the parameters for our modelling -->
-
-```{r survey-parameters, echo=T}
-# We can set the number of stations...
-n.stations <- 200
-
-
-```
-
-
-
-
-## Survey Simulation
-
-Here we get into the simulation pieces we need to compare models.  For example, we can have `r n.stations` that are randomly allocated across our survey domain
-
-```{r survey-simulate, include=FALSE}
-
-rand.samp <- st_sample(survey.domain,size = n.stations)
-
-rand.plt <- base.plt + geom_sf(data = rand.samp)
-rand.plt
-```
-
-But we could also have it to be stratified by the NAFO subarea too
-
-
-```{r survey-stratified-area, include = F}
-
-nafo.strata$stations <- nsplit(nafo.strata$p.area, n.stations) 
-
-# Grab samples, get a new ID field and combine back with the data in the nafo strata object
-strata.samp <- st_sample(nafo.strata, size = nafo.strata$stations,type = 'random', exact = T) %>%
-                        st_sf('ID' = seq(length(.)), 'geometry' = .) %>%
-                        st_intersection(., nafo.strata)
-
-
-strat.plt <- base.plt + geom_sf(data = strata.samp)
-strat.plt
-
-```
-
-
-Lots of other things you can stratify on as well, a classic is to stratify by depth, we can do that by using the bathymetry that we have in the above plots
- which is completely free to download  
-
-
-```{r survey-stratified-depth, include = F}
+#Lots of other things you can stratify on as well, a classic is to stratify by depth, we can do that by using the bathymetry that we have in the above plots
+# which is completely free to download  
 
 bathy.org <- getNOAA.bathy(lon1 = -72 ,lon2 = 65,lat1 = 40,lat2=44.5,resolution =1)
 bathy <- marmap::as.raster(bathy.org)
@@ -169,60 +165,587 @@ bathy.poly <- st_as_sf(bathy.st)
 # Make anything > 0 = 0, and anything < 250 = 250.  Our species won't go below 250 meters depth nor is it an amphibian
 bathy.poly$layer[bathy.poly$layer > 0] <- 0
 bathy.poly$layer[bathy.poly$layer < -250] <- -250
-    
-# Now we can simplify the object further so there isn't a polygon for every 1 meter difference, here we lump things into some nicer bins 
-bathy.poly$layer[bathy.poly$layer > -9] <- -5 # Make everything negative but less than 10 meters 5 meters
-bathy.poly$layer[bathy.poly$layer >-100 & bathy.poly$layer < -10] <- signif(bathy.poly$layer[bathy.poly$layer >-100 & bathy.poly$layer < -10],digits=1)
-bathy.poly$layer[bathy.poly$layer < -100 ] <- signif(bathy.poly$layer[bathy.poly$layer < -100 ],digits=2)
-# Now make a multi with each 10 meter depth strata a multipolygon object
-depth.strata <- aggregate(bathy.poly, list(bathy.poly$layer), function(x) x[1])
+bathy.poly$strata <- NA
+# Now we can simplify the object further so there isn't a polygon for every 1 meter difference, here we lump things into some nicer bins
+# Going to make depth contours every 20 meters.  Sure there is a nicer way to do this, but I don't know it...
+
+bathy.poly$strata[bathy.poly$layer >= -25]                          <- "< 25 meters" # Make everything great that 25 meter depth a strata
+bathy.poly$strata[bathy.poly$layer >= -50 & bathy.poly$layer < -25] <- "25 to 50 meters"
+bathy.poly$strata[bathy.poly$layer >= -75 & bathy.poly$layer < -50] <- "50 to 75 meters"
+bathy.poly$strata[bathy.poly$layer >=-100 & bathy.poly$layer < -75] <- "75 to 100 meters"
+bathy.poly$strata[bathy.poly$layer >=-125 & bathy.poly$layer < -100] <- "100 to 125 meters"
+bathy.poly$strata[bathy.poly$layer >=-150 & bathy.poly$layer < -125] <- "125 to 150 meters"
+bathy.poly$strata[bathy.poly$layer >=-175 & bathy.poly$layer < -150] <- "150 to 175 meters"
+bathy.poly$strata[bathy.poly$layer >=-200 & bathy.poly$layer < -175] <- "175 to 200 meters"
+bathy.poly$strata[bathy.poly$layer >=-225 & bathy.poly$layer < -200] <- "200 to 225 meters"
+bathy.poly$strata[bathy.poly$layer >=-250 & bathy.poly$layer < -225] <- "225 to 250 meters"
+bathy.poly$strata[bathy.poly$layer <=-250]                           <- "> 250 meters"
+
+# Now make a multi with each 25 meter depth strata a multipolygon object
+depth.strata <- aggregate(bathy.poly, list(bathy.poly$strata), function(x) x[1])
 # and now clip this to our survey domain (again, last time we used a raster bounding box to trim down, now we really clip it properly)
 depth.strata <- st_intersection(depth.strata,survey.domain)
 # And calculate the area of each bathy strata
 depth.strata$area <- st_area(depth.strata) %>% units::set_units("km^2") %>% as.numeric()
 tot.area.bathy <- sum(depth.strata$area) # It is within 3 km^2 of the survey domain, I'll take that!
 depth.strata$p.area <- depth.strata$area /tot.area.bathy
-# Now we can plot this new bathymetry
-p <- base.no.bathy + geom_sf(data = depth.strata,aes(fill = layer,color=layer))
-save_plot("D:/Github/Fisheries_module/Simplified_bathy.png",p,base_width = 10,base_height = 10)
 
-# And now we are ready to take next step and we can try and stratify the survey by depth
+
+```
+
+<!-- This code makes and saves the base plots, but does not display them -->
+
+```{r base-plts,echo=F, warning =F, message=F,include=F,cache=T}
+# This code makes and saves the base plots, but does not display them
+base.plt <- pecjector(area="GOM",repo = 'github', plot=F,
+                      add_layer = list(land ='grey',eez = 'eez',nafo = 'sub',scale.bar = 'tl',bathy = c(10,'s',250)),
+                      add_custom = list(obj = survey.domain,fill=NA,size=2,color='darkgrey'))
+# We'll also make this plot which we'll want for later, but won't plot now.
+base.no.bathy <- pecjector(area="GOM",repo = 'github', plot=F,
+                       add_layer = list(land ='grey',nafo = 'sub',scale.bar = 'tl'),
+                       add_custom = list(obj = survey.domain,fill=NA,size=2,color='darkgrey'))
+
+```
+
+
+
+# Survey Parameters
+
+Just so you can keep track in the document, we return the survey parameters that you set for this simulation.
+
+```{r paras, echo=F}
+
+# Now some derived parameters based on the area we are studying and the inputs provided at the top.
+m2.to.km2 <- 1e-6 # convert from m2 to km2
+area.swept <- area.swept*m2.to.km2 # Convert area swept by each tow into km²
+mn.bm.dens <- tot.biomass/tot.area# The mean biomass density in the region
+tot.towable.area <- tot.area / area.swept # This is the total possible number of tows one could do in the entire area.
+expected.bm.per.tow <- tot.biomass/tot.area*area.swept*1000*catchability # This is what we should expect to be the biomass per tow in KG given the above inputs.
+expect.survey.bm <- tot.biomass*catchability # This is what the biomass from the survey should be given the catchability.
+
+
+# Let's get all the parameters formatted nicely for a table so we can see them
+parameters <- data.frame(Parameter = c("Number of Tows ", "Total Biomass", 
+                                       "Catchability","Area swept by a tow",
+                                       "Number of Simulations","Biomass distribution"),
+                         Value     = c(     n.stations  ,    paste(tot.biomass, 'tonnes')  , 
+                                            catchability , paste(area.swept/m2.to.km2,"m²"),
+                                            n.sims ,              bm.dist))
+
+knitr::kable(parameters,booktabs=T, caption = "A Table of your input values for the current run of your simulation")
+
+```
+
+
+```{r survey-simulate, include=FALSE,cache=F}
+
+# Before we loop, we can get the NAFO and Depth areas and number of stations sorted out
+nafo.strata$stations <- nsplit(nafo.strata$p.area, n.stations) 
+# Now calculate the area swept in each of the areas, use a few metrics here
+nafo.strata <- nafo.strata %>% dplyr::mutate(area.surveyed = stations * area.swept,
+                                             towable.area = area/area.swept)
+
+#And now we can get ready to stratify by depth
 depth.strata$stations <-  nsplit(depth.strata$p.area, n.stations) 
+# Now calculate the area swept in each of the areas, use a few metrics here
+depth.strata <- depth.strata %>% dplyr::mutate(area.surveyed = stations * area.swept,
+                                             towable.area = area/area.swept)
 
-depth.samp <- st_sample(depth.strata, size = depth.strata$stations,type = 'random', exact = T) %>%
+rand.samp <- NULL
+nafo.samp <- NULL
+depth.samp <- NULL
+for(i in 1:n.sims)
+{
+# Now we can set up location of our samples based on the strata
+rand.samp[[i]] <- survey.domain %>% st_sample(size = n.stations) %>% st_sf()
+
+#But we could also have it to be stratified by the NAFO subarea too
+
+
+# Grab samples, get a new ID field and combine back with the data in the nafo strata object
+nafo.samp[[i]] <- st_sample(nafo.strata, size = nafo.strata$stations,type = 'random', exact = T) %>%
+                        st_sf('ID' = seq(length(.)), 'geometry' = .) %>%
+                        st_intersection(., nafo.strata)
+
+
+# strat.plt <- base.plt + geom_sf(data = nafo.samp)
+# strat.plt
+
+
+depth.samp[[i]] <- st_sample(depth.strata, size = depth.strata$stations,type = 'random', exact = T) %>%
                         st_sf('ID' = seq(length(.)), 'geometry' = .) %>%
                         st_intersection(., depth.strata)
+depth.samp[[i]]$id <- depth.samp$ID
+}
 
-p2 <- base.no.bathy + geom_sf(data = depth.strata,aes(fill = layer,color=layer)) + geom_sf(data =depth.samp,color='white')
-save_plot("D:/Github/Fisheries_module/depth_strata_sample_stations.png",p2,base_width = 10,base_height = 10)
+```
+
+<!-- We now distribute the biomass across the area according to the bm distribution scheme we set up.  Note that underlying the distribution
+     is a Gaussian random field with set characteristics, that would be interesting to play with that to see how that effects things, but that's not for now :-)
+-->
+
+```{r biomass-distros, include = F,echo=F,cache=F}
+# opts_chunk$set(cache.extra = knitr::rand_seed)
+#RFoptions(seed=as.integer(runif(1,-1e6,1e6)))
+# So here we make a gmrf which distributes our biomass across the area, this will effectively give us random spatial variability within the random cells.
+centroids <- st_centroid(survey.grid)# %>% data.frame()
+cent.split <- centroids %>% dplyr::summarise(lat = unlist(map(centroids$survey.grid,1)),
+                                      long = unlist(map(centroids$survey.grid,2)))
+
+# Make the bm.res object
+bm.res <- NULL
+for(i in 1:n.sims)
+{
+gmrf.pnts <- RFsimulate(model = RMgauss(var=4, scale =2), x=cent.split$lat, y=cent.split$long, grid=F)
+
+gmrf.pnts.sf <- st_as_sf(gmrf.pnts, crs = 4326)
+st_crs(gmrf.pnts.sf) <- 4326
+
+
+if(bm.dist == "Random")
+{
+# Now we should be able to merge back to the survey grid, I think...
+gmrf.bm <- st_join(survey.grid,gmrf.pnts.sf)
+# And when we plot it we get what we want... sweet
+#ggplot(gmrf.bm) + geom_sf(aes(fill= variable1)) + scale_fill_viridis_b()
+
+# Lets get the size of each grid
+gmrf.bm$grid.area <- gmrf.bm %>% st_area() %>% units::set_units("km^2") %>% as.numeric()
+# So now we can distribute the biomass based on the gmrf.bm object
+gmrf.bm$mn.bm.dens <- mn.bm.dens
+# Now we can adjust the biomass density using the gmrf values, not sure this really makes sense, but seems to be fairly reasonable
+gmrf.bm$bm.dens <- exp(log(gmrf.bm$mn.bm.dens) + gmrf.bm$variable1)
+# So we don't get exactly the same biomass because of how I'm doing the above, but we can corret this back to number we want in a second...
+gmrf.bm$biomass <- gmrf.bm$grid.area*gmrf.bm$bm.dens
+tmp.biomass <- sum(gmrf.bm$biomass)
+# Now we adjust it back to our initial biomass
+gmrf.bm$biomass <- gmrf.bm$biomass*tot.biomass/tmp.biomass
+gmrf.bm$bm.dens <- gmrf.bm$biomass/gmrf.bm$grid.area
+bm.res[[i]] <- gmrf.bm
+} #end if(bm.dist == "Random")
+
+
+# If we are looking at NAFO bimoass distribution do this
+if(bm.dist == "NAFO")
+{
+# So we first build a "NAFO Strata effect". I want this to be similar in size to our GMRF effect above, so somewhere in the -3 to 2 range should be fine
+# Here are some effect sizes for this, should be on par with the effect size of the GRMF with the default settings
+nafo.strata$effect <- c( 0.25,  #130
+                        -2.50,  #131
+                        -3.00,  #136
+                        -2.75,  #137
+                        -2.50,  #138
+                        -1.50,  #139
+                         0.75,  #140
+                         1.00,   #143
+                         2.0,   #144
+                         1.25,  #145
+                         1.00,  #146
+                         1.50,  #147
+                         1.25)  #148
+# Now the nafo strata and our grid 'boxes' aren't going to perfectly overlap, but we can do some gymnastics to have the strata effect due to nafo because
+# we did the above.... Start with the points...
+nafo.gmrf.pnts <- st_intersection(gmrf.pnts.sf,nafo.strata)
+nafo.gmrf.pnts$mn.bm.dens <- mn.bm.dens
+nafo.gmrf.pnts$bm.dens <- exp(log(nafo.gmrf.pnts$mn.bm.dens) + nafo.gmrf.pnts$variable1 + nafo.gmrf.pnts$effect)
+# Now we can take out the stratification indicators (seems to cause grief with next step)
+nafo.gmrf.pnts <- nafo.gmrf.pnts %>% dplyr::select(!c('id','level_0','level_1',"level_2","level_3","ID","area",'stations','area.surveyed','towable.area','p.area'))
+# Now put these into the survey grid
+gmrf.bm <- st_join(survey.grid,nafo.gmrf.pnts)
+#calculate the area of the cells
+gmrf.bm$grid.area <- gmrf.bm %>% st_area() %>% units::set_units("km^2") %>% as.numeric()
+# And have fun calculating biomasses
+gmrf.bm$biomass <- gmrf.bm$grid.area*gmrf.bm$bm.dens
+tmp.biomass <- sum(gmrf.bm$biomass)
+# Now we adjust it back to our initial biomass
+gmrf.bm$biomass <- gmrf.bm$biomass*tot.biomass/tmp.biomass
+gmrf.bm$bm.dens <- gmrf.bm$biomass/gmrf.bm$grid.area
+bm.res[[i]] <- gmrf.bm
+} # end if(bm.dist == "NAFO")
+
+
+
+# Finally, we can do the exact same thing with the depth stratification scheme
+if(bm.dist == "Depth")
+{
+# Here are some effect sizes for this, should be on par with the effect size of the GRMF with the default settings
+depth.strata$effect <- c(-2.50,  #<25
+                         -3.00,  #> 250
+                          2.00,  #100-125
+                          1.50 , #125-150
+                          0.50,  #150-175
+                          0.25,  #175-200
+                          0.00,  #200-225
+                         -1.00,  #225-250
+                         -1.50,  #25-50
+                         -0.50,  #50-75
+                          0.50)  #75-100
+# Now the depth strata and our grid 'boxes' aren't going to perfectly overlap, but we can do some gymnastics to have the strata effect due to depth because
+# we did the above.... Start with the points...
+depth.gmrf.pnts <- st_intersection(gmrf.pnts.sf,depth.strata)
+depth.gmrf.pnts$mn.bm.dens <- mn.bm.dens
+depth.gmrf.pnts$bm.dens <- exp(log(depth.gmrf.pnts$mn.bm.dens) + depth.gmrf.pnts$variable1 + depth.gmrf.pnts$effect)
+# Now we can take out the stratification indicators (seems to cause grief with next step)
+depth.gmrf.pnts <- depth.gmrf.pnts %>% dplyr::select(!c('Group.1','layer',"area",'strata','stations','area.surveyed','towable.area','p.area'))
+# Now put these into the survey grid
+gmrf.bm <- st_join(survey.grid,depth.gmrf.pnts)
+#calculate the area of the cells
+gmrf.bm$grid.area <- gmrf.bm %>% st_area() %>% units::set_units("km^2") %>% as.numeric()
+# And have fun calculating biomasses
+gmrf.bm$biomass <- gmrf.bm$grid.area*gmrf.bm$bm.dens
+tmp.biomass <- sum(gmrf.bm$biomass)
+# Now we adjust it back to our initial biomass
+gmrf.bm$biomass <- gmrf.bm$biomass*tot.biomass/tmp.biomass
+gmrf.bm$bm.dens <- gmrf.bm$biomass/gmrf.bm$grid.area
+bm.res[[i]] <- gmrf.bm
+} # end if(bm.dist == "Depth")                        
+}
+
+```
+
+<!-- Here we get the biomass estimates using tows that are randomly distributed across the survey area -->
+
+```{r rand-bm, echo=F,include=F,message=F,fig.width=8,fig.height=8}
+
+rand.tmp <- NULL
+#rand.samp <- survey.domain %>% st_sample(size = n.stations) %>% st_sf()
+for(i in 1:n.sims)
+{
+rand.samp.dat <- st_join(rand.samp[[i]],bm.res[[i]])
+# This is biomass in KG at the moment, just to make it make more sense.  Note the order of magnitude difference between the size of the stock and how many
+# are caught in this survey
+rand.samp.dat$sample.bm <- rlnorm(n.stations,log(catchability*rand.samp.dat$bm.dens*area.swept*1000),0.25)
+ # ggplot() + geom_sf(data = rand.samp.dat, aes(fill = sample.bm,color=sample.bm)) + 
+ #            geom_sf(data=survey.domain, fill = NA) +
+ #            scale_fill_viridis_b() + scale_color_viridis_b()
+
+# Now from here we use standard survey math to get a survey estimated biomass.  Steal from Stephens Simple survey code because i know that is done right :-)
+# The basic calculations for this are very straightforward, the average biomass per tow along with uncertainies
+bm.per.tow <- mean(rand.samp.dat$sample.bm)
+se.per.tow <- sd(rand.samp.dat$sample.bm)/sqrt(n.stations)
+# Our DF here is the number of stations
+ci.per.tow <- bm.per.tow + (c(qt(0.05/2, n.stations), -qt(0.05/2, n.stations)) * se.per.tow)
+
+# Alternatively, we just immediately can scale up to total area..
+bm.tot <- bm.per.tow* tot.towable.area /1000
+ci.tot <- ci.per.tow* tot.towable.area /1000
+
+# And here is our 'q corrected' survey biomass estimate from the random survey.
+bm.tot.q.cor <- bm.tot/catchability
+ci.tot.q.cor <- ci.tot/catchability
+rand.tmp[[i]] <- data.frame(biomass = c(bm.per.tow,bm.tot,bm.tot.q.cor),
+                       lci = c(min(ci.per.tow),min(ci.tot),min(ci.tot.q.cor)),
+                       uci = c(max(ci.per.tow),max(ci.tot),max(ci.tot.q.cor)),
+                       metric = c("Per Tow","Survey","Q-Corrected"),
+                       survey = rep('Random',3),
+                       simulation = rep(i,3))
+}
+
+rand.res <- do.call('rbind',rand.tmp)
+```
+
+<!-- Here we get the biomass estimates using tows that are distributed across the survey area according to NAFO stratification -->
+
+```{r nafo-bm, echo=F,include=F,message=F}
+
+nafo.tmp <- NULL
+for(i in 1:n.sims)
+{
+# Here's a go at it, 
+nafo.samp.dat <- st_join(nafo.samp[[i]],bm.res[[i]])
+# This is biomass in KG at the moment, just to make it make more sense.  Note the order of magnitude difference between the size of the stock and how many
+# are caught in this survey
+nafo.samp.dat$sample.bm.per.tow <- rlnorm(n.stations,log(catchability*nafo.samp.dat$bm.dens*area.swept*1000),0.25)
+# Biomass density in kg/km^2
+nafo.samp.dat$sample.bm.dens <- nafo.samp.dat$sample.bm.per.tow/area.swept
+# Now things get much more complex as we have to get stratified estimates.
+#First we get the mean for each strata, the 'id' field is strata at the moment
+strata.res <- nafo.samp.dat %>% dplyr::group_by(id,area,p.area,stations,area.surveyed,towable.area) %>% 
+                                dplyr::summarise(mn.ptow = mean(sample.bm.per.tow),
+                                                 var.ptow = var(sample.bm.per.tow))
+# Now we take these strata means and account for the area in each strata.  This is the biomass per tow
+strata.res  <- strata.res %>% dplyr::mutate(mn.pt.by.pa = mn.ptow*p.area)
+bm.per.tow <- sum(strata.res$mn.pt.by.pa)
+# Calculate the survey standard error.  In words... The Total number of towable units in a strata * difference 
+# So all the area calculations are done in 1a and 2a, then we multiply by the variance, then we have to divide by the number of stations
+se.calc.1 <- ((strata.res$area * (strata.res$area-strata.res$area.surveyed))) # Total area * Total area not surveyed
+se.calc.2 <- se.calc.1/sum(strata.res$area)^2 # Now we divide the above by the total area squared.  
+se.calc.3 <- se.calc.2 * strata.res$var.ptow # Then we multiply that by the variance 
+se.survey <- sum(se.calc.3/strata.res$stations,na.rm=T)^0.5 # then we divide this total by the number of stations, add up that number and take square root.
+  
+# Now we need to know the difference between the area towed and the possible area towed, needed to figure out DF later...
+#ah <- (strata.res$towable.area * (strata.res$towable.area - strata.res$stations))/strata.res$stations
+area.df <- (strata.res$area * (strata.res$area - strata.res$area.surveyed))/strata.res$area.surveyed
+# Degrees of freedom
+df <- (sum(area.df * strata.res$var.ptow, na.rm = TRUE)^2)/(sum(((area.df * strata.res$var.ptow)^2)/(strata.res$stations - 1), na.rm = TRUE))
+# And the size of our CI around the mean estimate (95% CI)
+ci.per.tow <- bm.per.tow + (c(qt(0.05/2, df), -qt(0.05/2, df)) * se.survey)
+# Now scale up to whole bank, all these calculations are done per tow, so how many 'tows' could one do in the whole region?
+bm.tot <- bm.per.tow*tot.towable.area /1000 # Note we are in kg/tow, reset to tonnes for whole bank
+ci.tot <- ci.per.tow * tot.towable.area /1000 # Note we are in kg/tow, reset to tonnes for whole bank
+# Q-corrected
+bm.tot.q.cor <- bm.tot/catchability
+ci.tot.q.cor <- ci.tot/catchability
+# Put it into a dataframe
+nafo.tmp[[i]] <- data.frame(biomass = c(bm.per.tow,bm.tot,bm.tot.q.cor),
+                       lci = c(min(ci.per.tow),min(ci.tot),min(ci.tot.q.cor)),
+                       uci = c(max(ci.per.tow),max(ci.tot),max(ci.tot.q.cor)),
+                       metric = c("Per Tow","Survey","Q-Corrected"),
+                       survey = rep('NAFO Strata',3),
+                       simulation = rep(i,3))
+}
+nafo.res <- do.call('rbind',nafo.tmp)
+
+```
+
+<!-- Here we get the biomass estimates using tows that are distributed across the survey area according to Depth stratification -->
+
+```{r depth-bm, echo=F,include=F,message=F}
+
+depth.tmp <- NULL
+for(i in 1:n.sims)
+{
+depth.samp.dat <- st_join(depth.samp[[i]],bm.res[[i]])
+# This is biomass in KG at the moment, just to make it make more sense.  Note the order of magnitude difference between the size of the stock and how many
+# are caught in this survey
+depth.samp.dat$sample.bm.per.tow <- rlnorm(n.stations,log(catchability*depth.samp.dat$bm.dens*area.swept*1000),0.25)
+# Biomass density in kg/km^2
+depth.samp.dat$sample.bm.dens <- depth.samp.dat$sample.bm.per.tow/area.swept
+# Now things get much more complex as we have to get stratified estimates.
+#First we get the mean for each strata, the 'id' field is strata at the moment
+depth.strata.res <- depth.samp.dat %>% dplyr::group_by(strata,area,p.area,stations,area.surveyed,towable.area) %>% 
+                                dplyr::summarise(mn.ptow = mean(sample.bm.per.tow),
+                                                 var.ptow = var(sample.bm.per.tow))
+# Now we take these strata means and account for the area in each strata.  This is the biomass per tow
+depth.strata.res  <- depth.strata.res %>% dplyr::mutate(mn.pt.by.pa = mn.ptow*p.area)
+bm.per.tow <- sum(depth.strata.res$mn.pt.by.pa)
+# Calculate the survey standard error.  In words... The Total number of towable units in a strata * difference 
+  # between Total number of towable units and the actual number of tows in the strata divided by square of total number 
+  # of towable units on the bank, multiply all this by variance in each strata, and divided everything by 
+  # the number of tows in each strata
+  # Finally add this up across all strata and take the square root.  In math this is...
+  # (sum((Nh_i * (Nh_i-nh_i)/sum(Nh_i)^2) * var_i) / nh_i)^0.5
+
+# I'm going to try this in terms of swept area and towable units cause I think they'll land in the same place right
+# calc.1 <- ((strata.res$towable.area * (strata.res$towable.area-strata.res$stations))) # Total
+# calc.2 <- calc.1/sum(strata.res$towable.area)^2
+# calc.3 <- calc.2 * strata.res$var
+# calc.4 <- sum(calc.3/strata.res$stations)^0.5
+# se.survey
+
+# So all the area calculations are done in 1a and 2a, then we multiply by the variance, then we have to divide by the number of stations
+se.calc.1 <- ((depth.strata.res$area * (depth.strata.res$area-depth.strata.res$area.surveyed))) # Total area * Total area not surveyed
+se.calc.2 <- se.calc.1/sum(depth.strata.res$area)^2 # Now we divide the above by the total area squared.  
+se.calc.3 <- se.calc.2 * depth.strata.res$var.ptow # Then we multiply that by the variance 
+se.survey <- sum(se.calc.3/depth.strata.res$stations,na.rm=T)^0.5 # then we divide this total by the number of stations, add up that number and take square root.
+  
+# Now we need to know the difference between the area towed and the possible area towed, needed to figure out DF later...
+#ah <- (strata.res$towable.area * (strata.res$towable.area - strata.res$stations))/strata.res$stations
+area.df <- (depth.strata.res$area * (depth.strata.res$area - depth.strata.res$area.surveyed))/depth.strata.res$area.surveyed
+# Degrees of freedom
+df <- (sum(area.df * depth.strata.res$var.ptow, na.rm = TRUE)^2)/(sum(((area.df * depth.strata.res$var.ptow)^2)/(depth.strata.res$stations - 1), na.rm = TRUE))
+# And the size of our CI around the mean estimate (95% CI)
+ci.per.tow <- bm.per.tow + (c(qt(0.05/2, df), -qt(0.05/2, df)) * se.survey)
+# Now scale up to whole bank, all these calculations are done per tow, so how many 'tows' could one do in the whole region?
+bm.tot <- bm.per.tow*tot.towable.area /1000 # Note we are in kg/tow, reset to tonnes for whole bank
+ci.tot <- ci.per.tow * tot.towable.area /1000 # Note we are in kg/tow, reset to tonnes for whole bank
+# Q-corrected
+bm.tot.q.cor <- bm.tot/catchability
+ci.tot.q.cor <- ci.tot/catchability
+# Put it into a dataframe
+depth.tmp[[i]] <- data.frame(biomass = c(bm.per.tow,bm.tot,bm.tot.q.cor),
+                       lci = c(min(ci.per.tow),min(ci.tot),min(ci.tot.q.cor)),
+                       uci = c(max(ci.per.tow),max(ci.tot),max(ci.tot.q.cor)),
+                       metric = c("Per Tow","Survey","Q-Corrected"),
+                       survey = rep('Depth Strata',3),
+                       simulation = rep(i,3))
+} # end for(i in 1:n.sims)
+depth.res <- do.call('rbind',depth.tmp)
+
+```
+
+
+<!-- This makes plot objects that we want for plotting the biomass distribution with the survey coverage for each of the stratification schemes -->
+
+```{r bm-dist,echo=F, warning =F, message=F,include =F}
+
+p.rand <- NULL
+p.nafo <- NULL
+p.depth <- NULL
+
+p.rand[[1]] <- base.no.bathy + geom_sf(data=bm.res[[1]], aes(fill = bm.dens,color=bm.dens)) + 
+                            geom_sf(data = rand.samp[[1]],color='white') + theme_map() +theme(legend.position = "none")+
+                            scale_color_viridis_c(option = 'C',direction =1) + scale_fill_viridis_c(option = 'C',direction =1)
+# Now the nafo coverage
+p.nafo[[1]] <- base.no.bathy + geom_sf(data=bm.res[[1]], aes(fill = bm.dens,color=bm.dens)) + 
+                            geom_sf(data = nafo.samp[[1]],color='white') + theme_map() +theme(legend.position = "none")+
+                            geom_sf(data = nafo.strata, fill = NA) +                          
+                            scale_color_viridis_c(option = 'C',direction =1) + scale_fill_viridis_c(option = 'C',direction =1)
+
+# Now the depth coverage
+p.depth[[1]] <- base.no.bathy + geom_sf(data=bm.res[[1]], aes(fill = bm.dens,color=bm.dens)) + 
+                            geom_sf(data = depth.samp[[1]],color='white') + theme_map() + theme(legend.position = "none")+
+                            geom_sf(data = depth.strata, fill = NA) +                          
+                            scale_color_viridis_c(option = 'C',direction =1) + scale_fill_viridis_c(option = 'C',direction =1)
+
+if(n.sims >1)
+{
+  # Now grab the same info for the second simulation
+  p.rand[[2]] <- base.no.bathy + geom_sf(data=bm.res[[2]], aes(fill = bm.dens,color=bm.dens)) + 
+                            geom_sf(data = rand.samp[[2]],color='white') + theme_map() +theme(legend.position = "none")+
+                            scale_color_viridis_c(option = 'C',direction =1) + scale_fill_viridis_c(option = 'C',direction =1)
+  # Now the nafo coverage
+  p.nafo[[2]] <- base.no.bathy + geom_sf(data=bm.res[[2]], aes(fill = bm.dens,color=bm.dens)) + 
+                            geom_sf(data = nafo.samp[[2]],color='white') + theme_map() +theme(legend.position = "none")+
+                            geom_sf(data = nafo.strata, fill = NA) +
+                            scale_color_viridis_c(option = 'C',direction =1) + scale_fill_viridis_c(option = 'C',direction =1)
+  # Now the depth coverage
+  p.depth[[2]] <- base.no.bathy + geom_sf(data=bm.res[[2]], aes(fill = bm.dens,color=bm.dens)) + 
+                            geom_sf(data = depth.samp[[2]],color='white') + theme_map() +theme(legend.position = "none")+
+                            geom_sf(data = depth.strata, fill = NA) +  
+                            scale_color_viridis_c(option = 'C',direction =1) + scale_fill_viridis_c(option = 'C',direction =1)
+  # If we have more than 2 simulations we also grab the last simulation and show that one too.
+  
+
+  if(n.sims >2)
+  {
+  # Now grab the same info for the second simulation
+  p.rand[[3]] <- base.no.bathy + geom_sf(data=bm.res[[3]], aes(fill = bm.dens,color=bm.dens)) + 
+                            geom_sf(data = rand.samp[[3]],color='white') + theme_map() +theme(legend.position = "none")+
+                            scale_color_viridis_c(option = 'C',direction =1) + scale_fill_viridis_c(option = 'C',direction =1)
+  # Now the nafo coverage
+  p.nafo[[3]] <- base.no.bathy + geom_sf(data=bm.res[[3]], aes(fill = bm.dens,color=bm.dens)) + 
+                            geom_sf(data = nafo.samp[[3]],color='white') + theme_map() +theme(legend.position = "none")+
+                            geom_sf(data = nafo.strata, fill = NA) +
+                            scale_color_viridis_c(option = 'C',direction =1) + scale_fill_viridis_c(option = 'C',direction =1)
+  # Now the depth coverage
+  p.depth[[3]] <- base.no.bathy + geom_sf(data=bm.res[[3]], aes(fill = bm.dens,color=bm.dens)) + 
+                            geom_sf(data = depth.samp[[3]],color='white') + theme_map() +theme(legend.position = "none")+
+                            geom_sf(data = depth.strata, fill = NA) +  
+                            scale_color_viridis_c(option = 'C',direction =1) + scale_fill_viridis_c(option = 'C',direction =1)
+  # If we have more than 2 simulations we also grab the last simulation and show that one too.
+  }#end  if(n.sims ==3)
+    
+  
+  if(n.sims >3)
+  {
+  # Now grab the same info for the final simulation
+  p.rand[[4]] <- base.no.bathy + geom_sf(data=bm.res[[n.sims]], aes(fill = bm.dens,color=bm.dens)) + 
+                            geom_sf(data = rand.samp[[n.sims]],color='white') + theme_map() + theme(legend.position = "none")+
+                            scale_color_viridis_c(option = 'C',direction =1) + scale_fill_viridis_c(option = 'C',direction =1)
+  # Now the nafo coverage
+  p.nafo[[4]] <- base.no.bathy + geom_sf(data=bm.res[[n.sims]], aes(fill = bm.dens,color=bm.dens)) + 
+                            geom_sf(data = nafo.samp[[n.sims]],color='white') + theme_map() + theme(legend.position = "none")+
+                            geom_sf(data = nafo.strata, fill = NA) +
+                            scale_color_viridis_c(option = 'C',direction =1) + scale_fill_viridis_c(option = 'C',direction =1)
+  # Now the depth coverage
+  p.depth[[4]] <- base.no.bathy + geom_sf(data=bm.res[[n.sims]], aes(fill = bm.dens,color=bm.dens)) + 
+                            geom_sf(data = depth.samp[[n.sims]],color='white') + theme_map() +theme(legend.position = "none")+
+                            geom_sf(data = depth.strata, fill = NA,) +  
+                            scale_color_viridis_c(option = 'C',direction =1) + scale_fill_viridis_c(option = 'C',direction =1)
+  } #end  if(n.sims > 3)
+
+}# ENd if(n.sims > 1)
+  
 
 
 ```
 
-So at this point we have a survey where we have no stratification, a survey stratified by NAFO area, and a survey that is stratified on depth.  Next up I need to make up some biomass distributions, we can distribute biomass randomly, within the NAFO areas, by depth, and maybe some other weird way.  
 
-I think to do this I'm gonna need to carve up the area into grids, that will let me do the random way and some other non-random way of doing it. I think the nafo and depth areas are my way in to splitting up the biomass in those (I think I'll probably need to go back to the bathy polygons to pull that off). Going to need to make each polygon kinda a biomass field aren't I, then we land a sample somewhere in that field to get estimate.  Lazy way would be to make each polygon have identical biomass everywhere (maybe that's the easy way) then we can make it more complex from there.
+## Survey Simulation
 
-## The Survey
-
-Here we set up the background for the survey, we're going to go out and do a survey in the Gulf of Maine (GOM) .
+So now we can review the input data we have for our survey.  First we will look at some figures. First off, lets take a look at our survey area, included in this figure are the North Atlantic Fishery Organization (NAFO) subareas that are the basis for the NAFO stratification, and the bathymetry of the region, which is used as the basis of the depth stratification (Figure \@ref(fig:base-plt)).  
 
 
+```{r base-plt,echo=F, warning =F, message=F,fig.width=8,fig.height=8, fig.cap="The assessment area for the Dusky Scalloped Shark (*Dustious maximus*) is outlined by the thick grey line. The thin black lines are the NAFO subareas in the region. The red line divides shows the division between the economic exclusive zone (EEZs) for Canada and the United States. The bathymetry in the region is also shown."}
 
-```{r over-plt,echo=F,message=F,warning = F,fig.width = 6, fig.height=8, fig.cap = "The Gulf of Maine (GOM) ecosystem, the red line inidates the *border* between Canada and the U.S.A. The thin black lines indicate the North Atlantic Fisheries Organization (NAFO) fishery polygons."}
-bp.bathy <-  pecjector(area="GOM",plot=F,repo = 'github',
-                       add_layer = list(land ='grey',nafo = 'sub',scale.bar = 'tl',bathy = c(10,'s',200)),
-                       c_sys = 32619,buffer = 0.2) + theme_map()
-bp.bathy
+base.plt 
 
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+Now we can also show the distribution of the biomass in the area.  If `r n.sims` is greater than 1 then we'll show two or three realizations from the models depending on how many simulations we ran. First we show the biomass distribution with the random survey stations overlain (Figure \@ref(fig:rand-samp-plt)).
+
+
+```{r rand-samp-plt,echo=F, warning =F, message=F,fig.width=7,fig.height=10, fig.cap="Biomass distribution with the random survey stations overlain"}
+# Now make our plot(s)
+if(n.sims == 1) p.rand.plt <- p.rand[[1]]  + ggtitle(paste("Simulation 1"))
+if(n.sims == 2) p.rand.plt <-   plot_grid(p.rand[[1]]+ ggtitle(paste("Simulations 1 and 2")),p.rand[[2]]+ ggtitle(""),ncol =1) 
+if(n.sims ==3)  p.rand.plt <-   plot_grid(p.rand[[1]]+ ggtitle(paste("Simulations 1, 2 and 3")),p.rand[[2]]+ ggtitle(""),p.rand[[3]],ncol =2)
+if(n.sims >3)   p.rand.plt <-   plot_grid(p.rand[[1]]+ ggtitle(paste("Simulations 1, 2, 3 and",n.sims)),p.rand[[2]]+ ggtitle(""),p.rand[[3]],p.rand[[4]],ncol =2)
+p.rand.plt
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Next we show the biomass distribution with the NAFO survey stations and NAFO strata overlain (Figure \@ref(fig:rand-samp-plt)). 
+
+```{r nafo-samp-plt,echo=F, warning =F, message=F,fig.width=7,fig.height=10, fig.cap="Biomass distribution with the NAFO survey stations and NAFO stratification polygons overlain"}
+# Now make our plot(s)
+if(n.sims == 1) p.nafo.plt <- p.nafo[[1]] + ggtitle(paste("Simulation 1"))
+if(n.sims == 2) p.nafo.plt <-   plot_grid(p.nafo[[1]]+ ggtitle(paste("Simulations 1 and 2")),p.nafo[[2]]+ ggtitle(""),ncol =1)
+if(n.sims == 3) p.nafo.plt <-   plot_grid(p.nafo[[1]]+ ggtitle(paste("Simulations 1, 2 and 3")),p.nafo[[2]]+ ggtitle(""),p.nafo[[3]],ncol =2)
+if(n.sims > 3)  p.nafo.plt <-   plot_grid(p.nafo[[1]]+ ggtitle(paste("Simulations 1, 2, 3 and",n.sims)),p.nafo[[2]]+ ggtitle(""),p.nafo[[3]],p.nafo[[4]],ncol =2)
+
+p.nafo.plt
+```
+
+Finally, we show the biomass distribuiton with the Depth survey stations and Depth stratification overlain (Figure \@ref(fig:depth-samp-plt))
+
+```{r depth-samp-plt,echo=F, warning =F, message=F,fig.width=7,fig.height=10, fig.cap="Biomass distribution with the Depth survey stations overlain and the Depth stratification polygons overlain."}
+# Now make our plot(s)
+if(n.sims == 1) p.depth.plt <- p.depth[[1]]+ ggtitle(paste("Simulation 1"))
+if(n.sims == 2) p.depth.plt <-   plot_grid(p.depth[[1]]+ ggtitle(paste("Simulations 1 and 2")),p.depth[[2]] + ggtitle(""),ncol =1)
+if(n.sims == 3) p.depth.plt <-   plot_grid(p.depth[[1]]+ ggtitle(paste("Simulations 1, 2 and 3")),p.depth[[2]]+ ggtitle(""),p.depth[[3]],ncol =2)
+if(n.sims > 3)  p.depth.plt <-   plot_grid(p.depth[[1]]+ ggtitle(paste("Simulations 1, 2, 3 and",n.sims)),p.depth[[2]]+ ggtitle(""),p.depth[[3]],p.depth[[4]],ncol =2)
+p.depth.plt
+```
+
+# Now we can compare the random survey estimates to the depth and NAFO stratified surveys.
+
+```{r bm-plts,echo=F,message=F,fig.width=7,fig.height=8, fig.cap = "Biomass estimates from the 3 different survey sampling schemes.  When the number of simulations run = 1 this provides the mean and 95% CI from that simulation.  When the number of simulations is >1 and < 10 the mean biomass for each simulation is shown.  When the number of simulations is >=10 we show the median biomass of the simulations along with the interquartile range of the biomass from the simulations",cache=F}
+
+res <- bind_rows(rand.res,nafo.res,depth.res)
+
+
+res$metric <- factor(res$metric, levels = c("Per Tow","Survey","Q-Corrected"))
+h.lines <- rep(rep(c(expected.bm.per.tow,expect.survey.bm,tot.biomass),3),n.sims)
+
+
+# If we 10 or more simulations, go with the modified boxplot
+if(n.sims >=10)
+{
+h.lines <- rep(c(expected.bm.per.tow,expect.survey.bm,tot.biomass),3)
+
+b.quants <- res %>% group_by(survey,metric) %>% dplyr::summarise(med = quantile(biomass,probs = c(0.5)),
+                                                                 q25 = quantile(biomass,probs = c(0.25)),
+                                                                 q75 = quantile(biomass,probs = c(0.75)))
+p.bm <- ggplot(b.quants) + geom_point(aes(y=med,x = survey)) + facet_wrap(~metric,scale='free_y',ncol = 1) +
+                geom_errorbar(aes(x=survey,ymin=q25,ymax=q75),width=0) + ylab("Median Biomass (with Interquartile Range)")+ xlab("")+
+                geom_hline(aes(yintercept = h.lines),color='grey',linetype='dashed') +
+                theme_bw()
+p.bm
+}
+
+# If we are running between 2 and 10 simulations plot the points only
+if(n.sims >1 & n.sims <10)
+{
+p.bm <- ggplot(res) + geom_text(aes(y=biomass,x = survey,label = simulation)) + facet_wrap(~metric,scale='free_y',ncol = 1) +
+                #geom_errorbar(aes(x=survey,ymin=lci,ymax=uci),width=0) + 
+                geom_hline(aes(yintercept = h.lines),color='grey',linetype='dashed') +
+                ylab("Mean Biomasfor each simulation ")+xlab("") + theme_bw()
+p.bm
+}
+
+# If we are running 1 simulation then we just make plot with the CIs.
+if(n.sims == 1)
+{
+p.bm <- ggplot(res) + geom_point(aes(y=biomass,x = survey),) + facet_wrap(~metric,scale='free_y',ncol = 1) +
+                geom_errorbar(aes(x=survey,ymin=lci,ymax=uci),width=0) + xlab("")+  ylab("Mean (with 95% CI)")+
+                geom_hline(aes(yintercept = h.lines),color='grey',linetype='dashed') +
+                theme_bw()
+p.bm
+}
+
+```
+
+
