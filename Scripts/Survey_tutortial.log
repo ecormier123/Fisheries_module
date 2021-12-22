@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.23 (TeX Live 2021/W32TeX) (preloaded format=pdflatex 2021.12.15)  21 DEC 2021 13:20
+This is pdfTeX, Version 3.141592653-2.6-1.40.23 (TeX Live 2021/W32TeX) (preloaded format=pdflatex 2021.12.15)  21 DEC 2021 23:54
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1080,7 +1080,7 @@ l.154 \end{document}
 Survey_tutortial.aux) ) 
 Here is how much of TeX's memory you used:
  23416 strings out of 480313
- 442228 string characters out of 5895695
+ 442226 string characters out of 5895695
  731988 words of memory out of 5000000
  40759 multiletter control sequences out of 15000+600000
  453426 words of font info for 101 fonts, out of 8000000 for 9000
@@ -1094,7 +1094,7 @@ f-dist/fonts/type1/public/lm/lmr10.pfb><c:/Users/KeithD/AppData/Roaming/TinyTeX
 /texmf-dist/fonts/type1/public/lm/lmr12.pfb><c:/Users/KeithD/AppData/Roaming/Ti
 nyTeX/texmf-dist/fonts/type1/public/lm/lmr17.pfb><c:/Users/KeithD/AppData/Roami
 ng/TinyTeX/texmf-dist/fonts/type1/public/lm/lmri10.pfb>
-Output written on Survey_tutortial.pdf (6 pages, 11589320 bytes).
+Output written on Survey_tutortial.pdf (6 pages, 11566980 bytes).
 PDF statistics:
  131 PDF objects out of 1000 (max. 8388607)
  100 compressed objects within 1 object stream
