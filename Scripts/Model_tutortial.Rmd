@@ -1,0 +1,156 @@
+---
+title: "Model Tutorial"
+author: "Eura Nama"
+output:
+  bookdown::word_document2:
+    fig_caption: yes
+    number_sections: false
+  fontsize: 12pt
+  sansfont: Liberation Sans
+  mainfont: Liberation Sans
+  classoption: twocolumn
+  language: english
+  #bookdown::html_document2: default
+  # bookdown::pdf_document2:
+  #     keep_tex: yes
+  #     number_sections: false
+  #     toc: no
+  #     # includes:
+  #     # in_header: "styling.sty"
+  # language: english
+  # classoption: twocolumn
+header-includes: 
+  - \usepackage{tikz} \usepackage{pdflscape} \usepackage{float}
+  - \newcommand{\blandscape}{\begin{landscape}}
+  - \newcommand{\elandscape}{\end{landscape}}
+---
+
+
+```{r setup, include=FALSE,echo=F, message=F,warning=F,cache=F}
+options(scipen = 999) # Just forces numbers to not be in scientific notiation
+# First up we will check your r packages and install anything you need for this for you.
+req.packages <- c("tidyverse","lubridate","plotly","sf","sp","data.table","units","cowplot","knitr",'concaveman',
+                  'ggthemes',"nngeo","marmap","RandomFields","ggplot2","stars","tmaptools","rnaturalearth",
+                  "rnaturalearthdata","raster","rgdal","RStoolbox","pals","ggnewscale","ggspatial",'devtools','rlist')
+# If you don't have the packages install them + give a heads up that you are
+new.packages <- req.packages[!(req.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)>0) 
+{
+  cat(paste0("Heads up, I have to install these packages for this to work:", new.packages ))
+  #wanna.install <- readline(prompt = "If you want to install these package(s) enter 'y': ")
+  #if(tolower(wanna.install) == 'y') 
+  install.packages(new.packages,repos = "http://cran.us.r-project.org") #else { stop("You didn't want to install the packages so this script does not work.")}
+}
+
+# You also need to install this github repo package if you do not have it.
+hi.res <- any(installed.packages()[,"Package"] %in% "rnaturalearthhires")
+if(hi.res == F) devtools::install_github("https://github.com/ropensci/rnaturalearthhires/")
+  
+
+# The libraries that we will use directly in this code
+library(knitr)
+library(ggplot2)
+library(gridExtra)
+library(reshape2)
+library(scales)
+library(cowplot)
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(RandomFields)
+library(sf)
+library(marmap)
+library(stars)
+library(raster)
+
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+# Set the Workding directory.
+direct.proj <- "D:/Github/Fisheries_module/"
+
+#Some Custom Functions I'll need
+funs <- c("https://raw.githubusercontent.com/Mar-Scal/Assessment_fns/master/Maps/pectinid_projector_sf.R",
+          "https://raw.githubusercontent.com/Mar-scal/Assessment_fns/master/Maps/centre_of_gravity.R",
+          "https://raw.githubusercontent.com/Mar-scal/Assessment_fns/master/Maps/add_alpha_function.R",
+          "https://raw.githubusercontent.com/Mar-scal/Assessment_fns/master/Maps/combo_shp.R",
+          "https://raw.githubusercontent.com/Dave-Keith/Assessment_fns/master/Maps/convert_coords.R",
+          "https://raw.githubusercontent.com/Dave-Keith/Fisheries_module/master/Scripts/Functions/beta_dist_rand_num.R",
+          "https://raw.githubusercontent.com/Dave-Keith/Fisheries_module/master/Scripts/Functions/function_to_call_beta_or_strected_beta_functions.R",
+          "https://raw.githubusercontent.com/Dave-Keith/Fisheries_module/master/Scripts/Functions/stretched_beta_dist_rand_num_new.R")
+
+# Now run through a quick loop to load each one, just be sure that your working directory is read/write!
+for(fun in funs) 
+{
+  download.file(fun,destfile = basename(fun))
+  source(paste0(getwd(),"/",basename(fun)))
+  file.remove(paste0(getwd(),"/",basename(fun)))
+}
+
+# A couple custom functions I may or may not use
+factor.2.number <- function(x) {as.numeric(levels(x))[x]} # My friend factor.2.number
+# Function in case you need it for transforming propotion data to not have 0's and 1's.  
+beta.transform <- function(dat,s=0.5)  (dat*(length(dat)-1) + s) / length(dat)
+# Cute little function to divide split something up by a weighting factor.
+nsplit = function(X,n)
+{
+  p = X/sum(X)
+  diff(round(n*cumsum(c(0,p))))
+}
+```
+
+
+
+```{r rand-field,echo=F,message=F,warning=F}
+# So there are 1399 points, so this returns it all in one big smoogle that we need to extract ourselves.
+# It appears that there is some auto-regressive component to the field as there is correlation through time.
+yrs <- 1990:2021
+tst <- RFsimulate(model = RMgauss(var=4, scale =2), x=cent.split$lat, y=cent.split$long, grid =F, T = yrs)
+# Make it an SF object
+tst.sf <- st_as_sf(tst, crs = 4326)
+# This extracts the year data from the SP object which we bind to our data.
+tst.sf$years <- tst@coords[,3]
+st_crs(tst.sf) <- 4326
+
+ggplot(tst.sf) + geom_sf(aes(fill = variable1,color=variable1),size=3) + scale_fill_viridis_b() + scale_color_viridis_b() + facet_wrap(~years)
+
+```
+
+
+So we have a method to generate random fields (or a bunch of them if we want) so now I want to make our model
+
+```{r model-dev, echo=F,message=F, warning=F}
+
+# Set up or parameters
+m   <- 0.2
+g   <- 1.1
+g.r <- 1.4
+ex  <- 0.15
+B <- 100000
+C <- NA
+B.tmp <- NA
+
+R <- rlnorm(yrs,log(20000),1)
+
+act.ex <- rlnorm(yrs,log(ex),0.1)
+act.m <- rlnorm(yrs,log(m),0.1)
+
+for(i in 1:yrs)
+{
+if(i == 1) 
+{
+  # Here we are handling catch and biomass a bit differently then below, in first year we set the biomass and then remove the catch from that
+  # This is really just being done to get a year '0' catch and biomass, might not even use this in the end, we'll see
+  C[i] <- B[i] * act.ex[i]
+}
+  
+if(i > 1)
+{
+  B.tmp[i] <- (B[i-1])*exp(-m)*g + R[i-1]*exp(-m)*g.r
+  C[i] <-  B.tmp[i] * act.ex[i]
+  B[i] <- B.tmp[i] -C[i]
+  
+}
+
+}# end the for loop
+
+```
+

@@ -28,7 +28,7 @@ header-includes:
 # Survey Tutorial Project
 
 1. Your job is to design an annual trawl survey for Dusky Scallop Shark (*Dustious maximus*; Figure \@ref(fig:nafo-plt)). The survey occurs June when the stock is spawning.
-2. The stock area shown has been chosen as a compromise between the stock biology, stakeholder input, and operational constraints.
+2. The stock area shown has been chosen as a compromise between the stock biology, stakeholder input, and operational constraints (Figure \@ref(fig:base-plt)(.
 3. In planning your survey there are 2 variables you can control
     a. You can vary the number of survey tows
         - From start to finish it takes approximately 3 hours to complete a tow and finish the scientific analyses
@@ -38,19 +38,17 @@ header-includes:
           - NAFO sub-areas (Figure \@ref(fig:nafo-plt))
           - Depth strata (Figure \@ref(fig:depth-plt))
         - Note that the tows will be allocated proportionally to the area of each stratum.
-4. You can also 'simulate' different biomass distributions to see if this changes you opinion on either the stratification scheme or the number of stations you need.
+4. You can also 'simulate' different biomass distributions to see if this changes your opinion on either the stratification scheme or the number of stations you need.
     a. The "Random" option distributes the biomass using a 'random field' 
         - There is a spatial pattern to the data but the pattern is randomly generated
     b. The "NAFO" option has an underlying 'random field' which sets the pattern for each simulation
         - Then this field is augmented depending on which NAFO strata you are in
-        - The central area biomasses are elevated
-        - The nearshore and offshore biomasses are lower
+        - The biomass in the central area is elevated
+        - The biomass in the nearshore and offshore areas are lowered
     c. The "Depth" option also has an underlying 'random field' which sets the pattern for each simulation
         - Then this field is augmented by each Depth strata
-        - As depths increase the biomasses will be lower than expected
+        - The biomass in deeper waters are lowered
         
-
-
 # Topics to Consider
 
 1. How does increasing the number of tows influence the accuracy and the precision of the results?
@@ -75,7 +73,7 @@ header-includes:
 
 ```{r survey-inputs, echo=F}
 # You can set the number of stations...
-n.tows <- 200
+n.tows <- 20
 
 # This sets up how the biomass is distributed through the region.
 bm.dist <- c("Random","NAFO","Depth") 
@@ -86,7 +84,7 @@ bm.dist <- bm.dist[2] # This makes the biomass distribution be a function of the
 #bm.dist <- bm.dist[3] # This makes the biomass distribution being a function of depth
 
 # This changes the number of simulations you run, I suggest trying 1, 4, and 250 (250 will be slow!) to see if it changes your opinion
-n.sims <- 1000
+n.sims <- 9
 
 ```
 
