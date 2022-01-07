@@ -97,7 +97,7 @@ n.sims <- 9
 # You can change the area that is covered by each survey tow. This value is in m². The default value of 10,000 is equivalent to a 2 km survey tow that is 5 meters wide
 # Changing this won't have as much impact as it might in real world as simulation of real world variability in densities would take hours, so we leave it 
 # as a fixed number
-area.swept <-  10000    # somewhere in the 1000's of square meters tends to make sense here for trawl kinds of gear.  Also need to convert to km²
+area.swept.m <-  10000    # somewhere in the 1000's of square meters tends to make sense here for trawl kinds of gear.  Also need to convert to km²
 # This too would have impacts on results if we had a more realistic biomass distribution scenario, but in this world we will leave it as is.
 tot.biomass <- 100000 # Could be any units, let's call it tonnes, and because of how I have this set up below this number isn't exact
 # Catchability could also be allowed to vary spatially, but that adds a layer of complexity that is beyond the scope of this exercise, so 
@@ -315,7 +315,7 @@ Just so you can keep track in the document, we return the survey parameters that
 
 # Now some derived parameters based on the area we are studying and the inputs provided at the top.
 m2.to.km2 <- 1e-6 # convert from m2 to km2
-area.swept <- area.swept*m2.to.km2 # Convert area swept by each tow into km²
+area.swept <- area.swept.m*m2.to.km2 # Convert area swept by each tow into km²
 mn.bm.dens <- tot.biomass/tot.area# The mean biomass density in the region
 tot.towable.area <- tot.area / area.swept # This is the total possible number of tows one could do in the entire area.
 expected.bm.per.tow <- tot.biomass/tot.area*area.swept*1000*catchability # This is what we should expect to be the biomass per tow in KG given the above inputs.
@@ -327,7 +327,7 @@ parameters <- data.frame(Parameter = c("Number of Tows ", "Total Biomass",
                                        "Catchability","Area swept by a tow",
                                        "Number of Simulations","Biomass distribution"),
                          Value     = c(     n.tows  ,    paste(tot.biomass, 'tonnes')  , 
-                                            catchability , paste(area.swept/m2.to.km2,"m²"),
+                                            catchability , paste(area.swept.m,"m²"),
                                             n.sims ,              bm.dist))
 
 knitr::kable(parameters,booktabs=T, caption = "A Table of your input values for the current run of your simulation")
@@ -396,7 +396,7 @@ for(i in 1:n.sims)
 {
 RFoptions(seed=NA)
 # So for just a random survey here's what we do....
-if(bm.dist == "Random") gmrf.pnts <- RFsimulate(model = RMgauss(var=4, scale =2), x=cent.split$lat, y=cent.split$long, grid=F)
+if(bm.dist == "Random") gmrf.pnts <- RFsimulate(model = RMgauss(var=1, scale =2), x=cent.split$lat, y=cent.split$long, grid=F)
 
 
 # If we have a NAFO biomass distribution we add a trend to the data, I've made up some weightings for this...
