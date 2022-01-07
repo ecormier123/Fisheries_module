@@ -73,15 +73,8 @@ run_model <- function(direct = "d:/Github/Fisheries_module", yr = as.numeric(for
   
   # Load in the functions needed for this function to run.
   
-  
-  source(paste(direct,"functions/projections.r",sep=""))
-  source(paste(direct,"functions/decision.r",sep=""))
-  source(paste(direct,"functions/post.plt.R",sep=""))
-  source(paste(direct,"functions/exploit.plt.r",sep=""))
-  source(paste(direct,"functions/fit.plt.R",sep=""))
-  source(paste(direct,"functions/diag.plt.R",sep=""))
-  source(paste(direct,"functions/biomass.plt.r",sep=""))
-  # The necesary library
+
+  # The necessary library
   library("R2jags")
   
   
