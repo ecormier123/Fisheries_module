@@ -24,21 +24,19 @@ model
 # priors of r.a=0 and r.b=1  give a median of 1, mean of 1.6, 90% of distribution density is < 4 and the distribution does allow for extreme values 
 for(t in 1:NY)
 {
-	r[t] ~ dlnorm(r.a, r.b)
+	R[t] ~ dlnorm(r.a, r.b)
 }
 	
 # priors for natural mortality of both recruits and fully recruited, again we estimate these parameters annually.
 # Priors of m.a =-2 and m.b = 2 results in a sampling distribution with a median of around 0.14, and m is generally < 1 though
 # extreme values can happen.
-for(t in 1:NY)
-{
-	M ~ dbeta(M.a, M.b)
-	m <- -log(1-M) # Convert from proportion to instantaneous rate
-}
+M ~ dbeta(M.a, M.b)
+m <- -log(1-M) # Convert from proportion to instantaneous rate
+
 
 
 # Survey catchability prior, q priors should be between 0.2 and 0.5 (based on US dredge studies), q.a = 20, q.b = 40 gets us this result.
-q ~ dlnorm(q.a, q.b)
+q ~ dbeta(q.a, q.b)
 
 
 # All the variance related Priors start here.
@@ -57,7 +55,7 @@ I.vsam <- 1/I.precision
 IR.precision ~ dgamma(IR.precision.a,IR.precision.b)
 # And it's variance
 IR.vsam <- 1/IR.precision
-} 
+
 ##############  END OF PRIORS ################################  END OF PRIORS ################################  END OF PRIORS ##################
 
 
@@ -77,7 +75,7 @@ for(t in 2:NY)
 {	
   # Our process model fit, natural mortality and catch remove individuals, growth terms increase size of individuals
   # and recruit term bring in the new recruits to the population.
-	Pmed[t] <- log(max(exp(-m) * G[t-1] * (P[t-1] - C[t]) + exp(-m)*GR[t-1] * r[t-1], 0.001))
+	Pmed[t] <- log(max(exp(-m) * G[t-1] * (P[t-1] - C[t]) + exp(-m)*GR[t-1] * R[t-1], 0.001))
 	# Now incorporate the process noise for our estimates of P
 	P[t] ~ dlnorm(Pmed[t], isigma2)
 }
@@ -93,7 +91,7 @@ for(t in 1:NY)
 	I[t] ~ dlnorm(Imed[t], I.precision)
 	
 	# Assumed relationship between observed survey recruit biomass index and "true" recruit biomass
-	IRmed[t] <- log(q * r[t])
+	IRmed[t] <- log(q * R[t])
   # the observation error for the survey recruit biomass index
 	IR[t] ~ dlnorm(IRmed[t], IR.precision)	
 }
@@ -105,7 +103,7 @@ for(t in 1:NY)
 	# Fully recruited biomass
 	B[t] <- P[t]
 	# Recruit biomass
-	R[t] <- r[t] 
+	#R[t] <- r[t] 
 	# Modelled fully recruited survey biomass estimate
 	Ipred[t] <- q * B[t]
 	# Modelled recruit survey biomass estimate
@@ -128,8 +126,8 @@ for(t in 1:NY)
 
   # Same residuals but standardized (remember these are precisions mostly so multiply by sqrt(precision) = divide by standard deviation)
 	sPresid[t] <- Presid[t] / sigma
-	sIresid[t] <- Iresid[t] * pow(I.precision[t],0.5)
-	sIRresid[t] <- IRresid[t] * pow(IR.precision[t],0.5)
+	sIresid[t] <- Iresid[t] * pow(I.precision,0.5)
+	sIRresid[t] <- IRresid[t] * pow(IR.precision,0.5)
 	#sCresid[t] <- 	Cresid[t] * pow(ikappa.tau2,0.5)
 	#sCRresid[t] <- 	CRresid[t] * pow(ikappa.rho2,0.5)
 	

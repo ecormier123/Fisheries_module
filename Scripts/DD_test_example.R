@@ -5,24 +5,15 @@
 
 # First import the silver hake data, it contains rows with adult and recruit biomass, and their uncertainty, and 
 # weights at various sizes
-direct = "d:/r/Courses/EAF/WG3/Delay_Difference/"
+direct = "d:/Github/Fisheries_module"
 
-#dat <- read.csv(paste(direct,"Data/Silver_Hake_raw.csv",sep=""))
-dat <- read.csv(paste(direct,"Data/Redfish_raw.csv",sep=""))
 
 ######################  Get our model parameters... Biomass ones are easy peasy.
-NY <- length(dat$year)
-mod.dat <- data.frame(year =  min(dat$year):max(dat$year),I = NA,IR=NA,g=NA,gR=NA)
-
 
 # Can we say is the recruts in this model are the age 1 individuals so our recruit growth
 # should be the growth from age 1 to age 2.  
-mod.dat <- data.frame(I = , 
-                      IR = , 
-                      g = , 
-                      GR = ,
-                      catch = ,
-                      )
+
+
 
 ###############################################################################################################
 ###############  Section 2, RUN THE MODEL###############  Section 2, RUN THE MODEL###############  Section 2, RUN THE MODEL
@@ -36,7 +27,7 @@ mod.dat <- data.frame(I = ,
 source(paste(direct,"functions/Model_function.R",sep=""))
 
 # Run the model, see the function for an explaination of all the model options.
-run_model(dat = mod.dat, direct = direct,fig="pdf"
+run_model(dat = mod.dat, direct = direct,fig="pdf",
           jags.model = "models/delay_difference_model_base.bug",
           nchains=6,niter = 1500,nburn = 1000)
 

@@ -59,15 +59,15 @@
 
 ###############################################################################################################
 
-run_model <- function(direct = "d:/Github/Fisheries_module", yr = as.numeric(format(Sys.time(), "%Y"))-1 , fig="screen",
-                        dat = dat, 
-                        m.priors = data.frame(M.a=2,M.b=6,MR.a=2,MR.b=6,year="all"), q.prior = NULL,
+run_model <- function(direct = "d:/Github/Fisheries_module", fig="screen",
+                        mod.dat = mod.dat, 
+                        m.priors = data.frame(M.a=2,M.b=6,MR.a=2,MR.b=6), q.prior = NULL,
                         # The output options
                         export.tables = F, plot.loc = paste(direct,"Results/",sep=""),
                         # The main model options, these are only used if run.mod = T. (Tho the options starting with "n" could be sent to 
                         # be used with the prediction evaluation model runs if the "pe." options are not specified and run.pre.eval.model=T)
-                        nchains = 8,niter = 175000, nburn = 100000, nthin = 20,parallel = T,strt.mod.yr = 1986,
-                        jags.model = "delay_difference_model_base",seed = 123,parameters = NULL,convergence.check = T)
+                        nchains = 8,niter = 175000, nburn = 100000, nthin = 20,parallel = T,
+                        jags.model = "delay_difference_model_base.bug",seed = 123,parameters = NULL)
   
 {
   
@@ -86,35 +86,30 @@ run_model <- function(direct = "d:/Github/Fisheries_module", yr = as.numeric(for
   plotsGo <- plot.loc
   
   DD.dat <- mod.dat
-  names(DD.dat) <- c("I","IR","g","gR","C","year") # just making catch turn into "C".
-  
   
   # Organize the data and set up the model priors/initialization data, then run the model.
   yrs<-min(DD.dat$year):max(DD.dat$year)
   DD.lst<-as.list(DD.dat)
   DD.lst$NY<- length(yrs)
   
-  
-  # Set up Priors.  First make sure our m priors are lined up properly.
-  if(nrow(m.priors) > 1) m.priors <- m.priors[m.priors$year %in% yrs,] # Subset to the correct number of years if you have multile years
-  if(nrow(m.priors) == 1) m.priors <- data.frame(M.a=rep(m.priors$M.a,DD.lst$NY),M.b=rep(m.priors$M.b,DD.lst$NY),
-                                                 MR.a=rep(m.priors$MR.a,DD.lst$NY),MR.b=rep(m.priors$MR.b,DD.lst$NY)) # If just one year make it a string...
   # Now our catchability priors
-  if(is.null(q.prior)) q.pr <- data.frame(a=0,b=1)# If we don't specify a q prior we make it a fairly specific prior centered at 0.33
+  if(is.null(q.prior)) q.pr <- data.frame(a=15,b=35)# If we don't specify a q prior we make it a fairly specific prior centered at 0.3
   if(!is.null(q.prior)) q.pr <- q.prior # if we do specify a q prior just rename it.
   
   
   DDpriors=list(
     # survey catchability fully recruited a= shape1, b=shape2
-    q=				    list(a=q.pr$a, 	       b=q.pr$b,		       d="dlnorm",	  l=1),		
+    q=				    list(a=q.pr$a, 	       b=q.pr$b,		       d="dbeta",	  l=1),		
     # process error (SD) a = min, b = max
-    sigma=			  list(a=0, 		         b=5,		             d="dunif",	  l=1),		
+    sigma=			  list(a=0.1, 		         b=5,		             d="dunif",	  l=1),		
     # measurement error variance survey FR a = shape, b = scale (1/rate)
-    I.precision=	list(a=Ip.a,	         b=Ip.b,	           d="dgamma",	l=1),		
+    I.precision=	list(a=0.1,	             b=5,	           d="dgamma",	l=1),		
     # measurement error variance survey recruits a = shape, b = scale (1/rate)
-    IR.precision=	list(a=IRp.a,	         b=IRp.b,            d="dgamma",	l=1),	
+    IR.precision=	list(a=0.1,	             b=5,            d="dgamma",	l=1),	
     # FR natural mortality, default mostly b/t 0.1-0.4
-    M=				    list(a=m.priors$M.a,   b=m.priors$M.b,		 d="dbeta",	  l=1),	
+    M=				    list(a=m.priors$M.a,   b=m.priors$M.b,		 d="dbeta",	  l=1),
+    # scaled recruit biomass, a= meanlog  b = sdlog
+    r=				    list(a=log(17000), 		         b=1,		             d="dlnorm",	l=DD.lst$NY)
   )
   
   
@@ -146,9 +141,9 @@ run_model <- function(direct = "d:/Github/Fisheries_module", yr = as.numeric(for
   names(prior.lst)<-paste(rep(prior.dat$par,2)[order(rep(1:nrow(prior.dat),2))],rep(c('a','b'),nrow(prior.dat)),sep='.')
   
   # Now if they haven't already been selected grab the parameters you want for the model.
-  ifelse(is.null(parameters) == T, parameters <- c(names(DDpriors),'K','P','B','R','mu','Imed','Ipred','Irep', 'IRmed','IRpred','IRrep',
-                                                   'sIresid','sIRresid','sPresid','Iresid','m','mR',
-                                                   'IRresid','Presid',"G","GR"),parameters)
+  ifelse(is.null(parameters) == T, parameters <- c(names(DDpriors),'K','P','B','R','mu','Imed','Ipred','IRmed','IRpred',
+                                                   'sIresid','sIRresid','sPresid','Iresid','m',
+                                                   'IRresid','Presid'),parameters)
   # Run the model
   start<-Sys.time()
   ## Call to JAGS, do you want to run in parallel?
@@ -156,14 +151,14 @@ run_model <- function(direct = "d:/Github/Fisheries_module", yr = as.numeric(for
   if(parallel==F)
   {
     out <- jags(data =  c(prior.lst,DD.lst), inits = NULL,parameters.to.save = parameters,  
-                model.file = paste(direct,jags.model,sep=""),n.chains = nchains, n.iter = niter, n.burnin = nburn, 
+                model.file = "D:/Github/Fisheries_module/Scripts/Functions/delay_difference_model_base.bug",n.chains = nchains, n.iter = niter, n.burnin = nburn, 
                 n.thin = nthin)
   }
   
   if(parallel==T)
   {
     out <- jags.parallel(data =  c(prior.lst,DD.lst), inits = NULL,parameters.to.save = parameters,  
-                         model.file = paste(direct,jags.model,sep=""),n.chains = nchains, n.iter = niter, n.burnin = nburn, 
+                         model.file = "D:/Github/Fisheries_module/Scripts/Functions/delay_difference_model_base.bug",n.chains = 8, n.iter = 10000, n.burnin = 1000, 
                          n.thin = 20,jags.seed = seed)
   }
   # How long did that take?
@@ -195,20 +190,12 @@ run_model <- function(direct = "d:/Github/Fisheries_module", yr = as.numeric(for
   
   
   # Some model outputs needed for the Update.  First the mortality
-  mort <- 1- exp(-DD.out$mean$m[length(DD.out$mean$m)])
-  mort.R <- 1- exp(-DD.out$mean$mR[length(DD.out$mean$mR)])
-  # This lines up the column headers with the projected catch...
-  TACI <- which(DD.out$data$C.p==(proj.catch))
-  # This get us the predicted biomass for next year based on the projected catch
-  BM.proj.1yr <- DD.out$median$B.p[TACI]
-  # This is only useful for GBa at the moment since BBn doesn't have reference points accepted yet...
-  
+  mort <- 1- exp(-DD.out$mean$m)
+
+
   # Get the quantiles, this likely would need changed, but which quantile is > our URP (13,284 as of 2015)
   B.quantiles <- quantile(DD.out$sims.list$B[,length(DD.out$sims.list$B[1,])],probs=seq(0,1,0.01))
-  # This is the probability (well percentage) that Biomass is below the USR
-  prob.below.USR <- names((which(B.quantiles > URP)[1]))
-  
-  
+
   # Here we can grab the Fully recruited and recruit biomass for the last 2 years and the median of the time series.
   FR.bm <- DD.out$median$B[(length(DD.out$mean$B)-1):length(DD.out$median$B)]
   # We exclude the current year from the median estimate

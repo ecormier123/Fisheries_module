@@ -31,7 +31,7 @@ options(scipen = 999) # Just forces numbers to not be in scientific notiation
 # First up we will check your r packages and install anything you need for this for you.
 req.packages <- c("tidyverse","lubridate","plotly","sf","sp","data.table","units","cowplot","knitr",'concaveman',
                   'ggthemes',"nngeo","marmap","RandomFields","ggplot2","stars","tmaptools","rnaturalearth",
-                  "rnaturalearthdata","raster","rgdal","RStoolbox","pals","ggnewscale","ggspatial",'devtools','rlist','matlab')
+                  "rnaturalearthdata","raster","rgdal","RStoolbox","pals","ggnewscale","ggspatial",'devtools','rlist','matlab','coda','rjags','R2jags')
 # If you don't have the packages install them + give a heads up that you are
 new.packages <- req.packages[!(req.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)>0) 
@@ -63,6 +63,7 @@ library(marmap)
 library(stars)
 library(raster)
 library(matlab)
+library(R2jags)
 
 knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
 # Set the Workding directory.
@@ -77,6 +78,11 @@ funs <- c("https://raw.githubusercontent.com/Mar-Scal/Assessment_fns/master/Maps
           "https://raw.githubusercontent.com/Dave-Keith/Fisheries_module/master/Scripts/Functions/beta_dist_rand_num.R",
           "https://raw.githubusercontent.com/Dave-Keith/Fisheries_module/master/Scripts/Functions/function_to_call_beta_or_strected_beta_functions.R",
           "https://raw.githubusercontent.com/Dave-Keith/Fisheries_module/master/Scripts/Functions/Model_function.R",
+          "https://raw.githubusercontent.com/Dave-Keith/Fisheries_module/master/Scripts/Functions/post.plt.R",
+          "https://raw.githubusercontent.com/Dave-Keith/Fisheries_module/master/Scripts/Functions/exploit.ggplt.R",
+          "https://raw.githubusercontent.com/Dave-Keith/Fisheries_module/master/Scripts/Functions/fit.plt.R",
+          "https://raw.githubusercontent.com/Dave-Keith/Fisheries_module/master/Scripts/Functions/diag.plt.R",
+          "https://raw.githubusercontent.com/Dave-Keith/Fisheries_module/master/Scripts/Functions/biomass.plt.R",
           "https://raw.githubusercontent.com/Dave-Keith/Fisheries_module/master/Scripts/Functions/stretched_beta_dist_rand_num_new.R")
 
 
@@ -183,7 +189,7 @@ tot.towable.area <- tot.area / area.swept # This is the total possible number of
 
 
 # Let's get all the parameters formatted nicely for a table so we can see them
-parameters <- data.frame(Parameter = c("Number of Tows ", 
+input.paras <- data.frame(Parameter = c("Number of Tows ", 
                                        "Catchability",
                                        "Area swept by a tow",
                                        "Number of Simulations",
@@ -194,7 +200,7 @@ parameters <- data.frame(Parameter = c("Number of Tows ",
                                         n.sims,
                                         surv.dist))
 
-knitr::kable(parameters,booktabs=T, caption = "A Table of your input values for the current run of your simulation")
+knitr::kable(input.paras,booktabs=T, caption = "A Table of your input values for the current run of your simulation")
 ```
 
 
@@ -550,19 +556,21 @@ biomass and removals.
 
 mod.dat <- data.frame(I = bm.est.dat %>% dplyr::filter(metric == "Survey") %>% dplyr::select(biomass) %>% unname(), 
                       IR = rec.est.dat %>% dplyr::filter(metric == "Survey") %>% dplyr::select(biomass) %>% unname(),
-                      g = mod.actual$growth.adults,
+                      G = mod.actual$growth.adults,
                       GR = mod.actual$growth.recruits,
-                      catch = mod.actual$catch)
-NY <- nrow(mod.dat)
+                      C = mod.actual$catch,
+                      year = yrs)
+
 
 
 # Load in the model function
 source(paste(direct,"functions/Model_function.R",sep=""))
 
-# Run the model, see the function for an explaination of all the model options.
-run_model(dat = mod.dat, direct = direct,fig="pdf",
+# Run the model, see the function for an explanation of all the model options.
+run_model(mod.dat = mod.dat, direct = direct,fig="pdf",
           jags.model = "models/delay_difference_model_base.bug",
           nchains=6,niter = 1500,nburn = 1000)
 
+plot(DD.out$mean$R ~ mod.actual$recruits)
 
 ```
