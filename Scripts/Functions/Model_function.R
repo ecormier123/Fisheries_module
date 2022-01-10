@@ -3,11 +3,7 @@
 # individuals and the total catch for each year.
 ###################################################################
 # Update history
-# January 2016 - Revised by DK 
-# April 2016, "Update" script has been overhauled and converted to a function called "Update_function_JAGS"
-# May 16, 2016, updated to include options to allow different databases/usernames in the call to the fishery data.
-# Sept 20, 2016, updated to allow for different loader files to be called in from the output of Survey_Summary_data.r. Removed spatial figures
-# March 14, 2017 - Revision to the Scallop update function, using somewhat simplier DD model...
+# Revised function to be used for Fisheries course
 #####################################  Function Summary ########################################################
 ####  
 ##  This function is used within these files:(a.k.a "dependent files") 
@@ -22,12 +18,8 @@
 
 ###############################################################################################################
 # Arguments
-# 1:  direct:                   The root directory to work from  Default = "d:/r/", 
 # 5:  mod.dat                       The data to load, can be  a "csv" or "RData" file.  See previous, default is a "RData" file
 #                               located here....paste(direct,"Data/Model_input.RData",sep="")
-# 6:  fig:                      Print to 'pdf' or to screen.  default="screen":
-# 7:  plot.loc                  If you are saving plots as pdf's where do you want to put them...
-
 ###########  Results options.  These options set up how the results from the model will be processed and influence our predictions
 
 #16:  M.prior:                      We can specify our priors for mortality of commercial and recruit "fish".
@@ -58,8 +50,7 @@
 
 ###############################################################################################################
 
-run_model <- function(direct = "d:/Github/Fisheries_module", fig="screen",
-                        mod.dat = mod.dat, 
+run_model <- function(mod.dat = mod.dat, 
                         m.prior = data.frame(a=2,b=6), 
                         q.prior =  data.frame(a=15,b=35),
                         r.prior = data.frame(a=30000,b=1000),
@@ -82,8 +73,7 @@ run_model <- function(direct = "d:/Github/Fisheries_module", fig="screen",
   #############  Section 1 Model#############  Section 1 Model#############  Section 1 Model#############  Section 1 Model ###########
   #############  Section 1 Model#############  Section 1 Model#############  Section 1 Model#############  Section 1 Model ###########
   
-  # Set the working directory for figures and tables to be output
-  jags.mod <- 
+  # Set the working directory for figures and tables to be outpu
   
   DD.dat <- mod.dat
   
