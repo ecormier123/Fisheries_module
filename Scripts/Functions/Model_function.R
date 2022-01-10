@@ -23,15 +23,15 @@
 ###############################################################################################################
 # Arguments
 # 1:  direct:                   The root directory to work from  Default = "d:/r/", 
-# 5:  dat                       The data to load, can be  a "csv" or "RData" file.  See previous, default is a "RData" file
+# 5:  mod.dat                       The data to load, can be  a "csv" or "RData" file.  See previous, default is a "RData" file
 #                               located here....paste(direct,"Data/Model_input.RData",sep="")
 # 6:  fig:                      Print to 'pdf' or to screen.  default="screen":
 # 7:  plot.loc                  If you are saving plots as pdf's where do you want to put them...
 
 ###########  Results options.  These options set up how the results from the model will be processed and influence our predictions
 
-#16:  M.priors:                      We can specify our priors for mortality of commercial and recruit "fish".
-#                                    default = data.frame(M.a=2,M.b=6,mR.a=2,MR.b=6)
+#16:  M.prior:                      We can specify our priors for mortality of commercial and recruit "fish".
+#                                    default = data.frame(a=2,b=6)
 #17:  q.prior                        The catchability prior, this is modeled as a Beta distribution.  Default is NULL which 
 #                                    uses a prior of dbeta(20,40), which is a relatively tight prior centered at 0.33 (this is for the scallop model.)
 #                                    q.prior = data.frame(a=10,b=50) would give median q around 0.16, see scripts with "A Beta distribution moment" 
@@ -52,18 +52,18 @@
 #28:  parameters:               Model parameters to output.  Default = NULL which will produce all of the priors + the following parameters
 #                               'K','P','B','R','mu','Imed','Ipred','Irep', 'IRmed','IRpred',
 #                               'IRrep','sIresid','sIRresid','sPresid','Iresid','IRresid','Presid'
-#29  export.tables:             Export the Decision tables, should only be done when satisified with results.  T/F, default = F
-#30  convergence.check:         Do you want to run the convergence check. T/F, default = T.  The convergence check produces a pdf
-#                               which shows the mixing and ACF for each of the parameters/chains in the model.
+
+
 #######################################################################################################################################
 
 ###############################################################################################################
 
 run_model <- function(direct = "d:/Github/Fisheries_module", fig="screen",
                         mod.dat = mod.dat, 
-                        m.priors = data.frame(M.a=2,M.b=6,MR.a=2,MR.b=6), q.prior = NULL,
+                        m.prior = data.frame(a=2,b=6), 
+                        q.prior =  data.frame(a=15,b=35),
                         # The output options
-                        export.tables = F, plot.loc = paste(direct,"Results/",sep=""),
+                        plot.loc = paste(direct,"Results/",sep=""),
                         # The main model options, these are only used if run.mod = T. (Tho the options starting with "n" could be sent to 
                         # be used with the prediction evaluation model runs if the "pe." options are not specified and run.pre.eval.model=T)
                         nchains = 8,niter = 175000, nburn = 100000, nthin = 20,parallel = T,
@@ -92,24 +92,22 @@ run_model <- function(direct = "d:/Github/Fisheries_module", fig="screen",
   DD.lst<-as.list(DD.dat)
   DD.lst$NY<- length(yrs)
   
-  # Now our catchability priors
-  if(is.null(q.prior)) q.pr <- data.frame(a=15,b=35)# If we don't specify a q prior we make it a fairly specific prior centered at 0.3
-  if(!is.null(q.prior)) q.pr <- q.prior # if we do specify a q prior just rename it.
-  
-  
   DDpriors=list(
     # survey catchability fully recruited a= shape1, b=shape2
-    q=				    list(a=q.pr$a, 	       b=q.pr$b,		       d="dbeta",	  l=1),		
+    q=				    list(a=q.prior$a, 	       b=q.prior$b,		       d="dbeta",	  l=1),		
     # process error (SD) a = min, b = max
     sigma=			  list(a=0.1, 		         b=5,		             d="dunif",	  l=1),		
     # measurement error variance survey FR a = shape, b = scale (1/rate)
-    I.precision=	list(a=0.1,	             b=5,	           d="dgamma",	l=1),		
+    I.precision=	list(a=0.5,	             b=1,	           d="dgamma",	l=1),		
     # measurement error variance survey recruits a = shape, b = scale (1/rate)
-    IR.precision=	list(a=0.1,	             b=5,            d="dgamma",	l=1),	
+    IR.precision=	list(a=0.5,	             b=1,            d="dgamma",	l=1),	
     # FR natural mortality, default mostly b/t 0.1-0.4
-    M=				    list(a=m.priors$M.a,   b=m.priors$M.b,		 d="dbeta",	  l=1),
+    M=				    list(a=m.prior$a,   b=m.prior$b,		 d="dbeta",	  l=1),
     # scaled recruit biomass, a= meanlog  b = sdlog
-    r=				    list(a=log(17000), 		         b=1,		             d="dlnorm",	l=DD.lst$NY)
+    r=				    list(a=log(75000), 		   b=1000,	     d="dlnorm",	l=DD.lst$NY),
+    # initial biomass estimate
+    bs=				    list(a=log(100000), 	   b=0.5,	     d="dlnorm",	l=1)
+    
   )
   
   
@@ -141,9 +139,8 @@ run_model <- function(direct = "d:/Github/Fisheries_module", fig="screen",
   names(prior.lst)<-paste(rep(prior.dat$par,2)[order(rep(1:nrow(prior.dat),2))],rep(c('a','b'),nrow(prior.dat)),sep='.')
   
   # Now if they haven't already been selected grab the parameters you want for the model.
-  ifelse(is.null(parameters) == T, parameters <- c(names(DDpriors),'K','P','B','R','mu','Imed','Ipred','IRmed','IRpred',
-                                                   'sIresid','sIRresid','sPresid','Iresid','m',
-                                                   'IRresid','Presid'),parameters)
+  ifelse(is.null(parameters) == T, parameters <- c(names(DDpriors),'B','R','mu','Imed','Ipred','IRmed','IRpred',
+                                                   'sIresid','sIRresid','sPresid','Iresid','IRresid','Presid'),parameters)
   # Run the model
   start<-Sys.time()
   ## Call to JAGS, do you want to run in parallel?
@@ -173,61 +170,13 @@ run_model <- function(direct = "d:/Github/Fisheries_module", fig="screen",
   
   
   # Save the model results
-  save(DD.lst, DDpriors,DD.out,mod.dat,yr,DD.dat,
-       file=paste(direct,"Results/Model_results.RData",sep=""))
+  save(DD.lst, DDpriors,DD.out,mod.dat,DD.dat,
+       file=paste(direct,"/Results/Lecture_3/Model_results.RData",sep=""))
   
   
   ############# END Section 2 Model#############  END Section 2 Model#############  END Section 2 Model#############  
   ############# END Section 2 Model#############  END Section 2 Model#############  END Section 2 Model#############  
   ############# END Section 2 Model#############  END Section 2 Model#############  END Section 2 Model#############  
-  
-  
-  
-  
-  ############# Section 3 Some model result summaries and figures############# ############# Section 3 Some model result summaries and figures############# 
-  ############# Section 3 Some model result summaries and figures############# ############# Section 3 Some model result summaries and figures############# 
-  # If we want the diagnostics  this is the section.  
-  
-  
-  # Some model outputs needed for the Update.  First the mortality
-  mort <- 1- exp(-DD.out$mean$m)
-
-
-  # Get the quantiles, this likely would need changed, but which quantile is > our URP (13,284 as of 2015)
-  B.quantiles <- quantile(DD.out$sims.list$B[,length(DD.out$sims.list$B[1,])],probs=seq(0,1,0.01))
-
-  # Here we can grab the Fully recruited and recruit biomass for the last 2 years and the median of the time series.
-  FR.bm <- DD.out$median$B[(length(DD.out$mean$B)-1):length(DD.out$median$B)]
-  # We exclude the current year from the median estimate
-  FR.ltm <- median(DD.out$median$B[-length(DD.out$median$B)])
-  # Recruit biomass
-  rec.bm <- DD.out$median$R[(length(DD.out$median$R)-1):length(DD.out$median$R)]
-  # We exclude the current year from the median estimate
-  rec.ltm <- median(DD.out$median$R[-length(DD.out$median$R)])
-  
-  # Get the percent biomass change from the projection. 0 means unchanged, + means % increase, - means % decline
-  percent.B.change <- (BM.proj.1yr / DD.out$median$B[length(DD.out$median$B)]) -1
-  
-  
-  save(mort,mort.R,TACI,BM.proj.1yr,B.quantiles,percent.B.change,prob.below.USR,FR.bm,FR.ltm,rec.bm,rec.ltm,
-       file=paste(direct,"Results/Model_results_and_diagnostics.RData",sep=""))
-  
-  #####Plot model diagnostics############## 
-  # These plots include the posterior fits, exploitation estimate, Biomass fit to survey and CPUE, residual plot
-  # and the model coinvergence plot (which is a 700+ page pdf of the convergence of each parameter + it's ACF.)
-  # posterior densities for model parameters
-  post.plt(DD.out,DDpriors,years=yrs, graphic=fig,multi=T,path=plotsGo)
-  #dev.off()
-  ##exploitaiton time series
-  exploit.plt(DD.out, years=yrs, plt=c('f','m','mR'),graphic=fig,path=plotsGo)
-  #dev.off()
-  # model biomass fit to survey
-  fit.plt(DD.out, years = yrs, CI=T,graphic=fig,path=plotsGo,CV=T)
-  # diagnostic plot
-  diag.plt(DD.out, years = yrs,graphic=fig,path=plotsGo)
-  # The biomass plot for fully recruited and recruits along with the projection
-  biomass.plt(DD.out,years=yrs, graphic=fig,TAC=proj.catch,path=plotsGo,refs = c("LRP","URP","zones"),pred=1,
-              URP =URP, LRP=LRP,avg.line=median)
   
   
 } # end function

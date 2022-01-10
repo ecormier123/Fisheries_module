@@ -21,7 +21,7 @@ model
 #}
 
 # priors for survey recruitment index, note we get get this estimate annually.
-# priors of r.a=0 and r.b=1  give a median of 1, mean of 1.6, 90% of distribution density is < 4 and the distribution does allow for extreme values 
+# This is a simple uniform which basically allows for anything with our R values.
 for(t in 1:NY)
 {
 	R[t] ~ dlnorm(r.a, r.b)
@@ -64,20 +64,19 @@ IR.vsam <- 1/IR.precision
 ##############################################################################################################################
 
 #############Process Model#############Process Model#############Process Model#############Process Model
-# Give Pmed an initial value, note that Pmed is on log scale.  Remember P/Pmed is simply used as a scaling term to help convergence
-# and is B/K, where B is biomass and K is the scaling constant
-Pmed[1] ~ dnorm(0, 0.1)
-# Based on the initial value for Pmed, this gets an initial value for P
-P[1] ~ dlnorm(Pmed[1], isigma2)
+# Give Bmed a prior
+Bmed[1] ~ dlnorm(bs.a, bs.b)
+# Based on the initial value for Bmed, this gets an initial value for P
+B[1] ~ dlnorm(log(Bmed[1]), isigma2)
 
 # Here is our process/state equation from year 2 to the final year (likelihood) for the biomass
 for(t in 2:NY)
 {	
   # Our process model fit, natural mortality and catch remove individuals, growth terms increase size of individuals
   # and recruit term bring in the new recruits to the population.
-	Pmed[t] <- log(max(exp(-m) * G[t-1] * (P[t-1] - C[t]) + exp(-m)*GR[t-1] * R[t-1], 0.001))
+	Bmed[t] <- log(max(exp(-m) * G[t-1] * (B[t-1] - C[t]) + exp(-m)*GR[t-1] * R[t-1], 0.001))
 	# Now incorporate the process noise for our estimates of P
-	P[t] ~ dlnorm(Pmed[t], isigma2)
+	B[t] ~ dlnorm(Bmed[t], isigma2)
 }
 
 ############# Observation Models############# Observation Models############# Observation Models############# 
@@ -86,7 +85,7 @@ for(t in 2:NY)
 for(t in 1:NY)
 {
 	# Assumed relationship between observed survey biomass index and "true" biomass
-	Imed[t] <- log(q *  P[t])
+	Imed[t] <- log(q *  B[t])
   # the observation error for the survey biomass index
 	I[t] ~ dlnorm(Imed[t], I.precision)
 	
@@ -100,8 +99,7 @@ for(t in 1:NY)
 # Various derived quantities we're interested in.
 for(t in 1:NY)
 {
-	# Fully recruited biomass
-	B[t] <- P[t]
+
 	# Recruit biomass
 	#R[t] <- r[t] 
 	# Modelled fully recruited survey biomass estimate
@@ -121,7 +119,7 @@ for(t in 1:NY)
   # Standard residuals for fully recruited and recruit biomass along with the Process term
 	Iresid[t] <- log(I[t]) - Imed[t]
 	IRresid[t] <- log(IR[t]) - IRmed[t]
-	Presid[t] <- log(P[t]) - Pmed[t]
+	Presid[t] <- log(B[t]) - Bmed[t]
 
 
   # Same residuals but standardized (remember these are precisions mostly so multiply by sqrt(precision) = divide by standard deviation)
