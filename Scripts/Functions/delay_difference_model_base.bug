@@ -4,21 +4,7 @@ model
 ##################### Priors ##################### Priors ##################### Priors##################### Priors
 ##############################################################################################################################
 
-# K is the model "rescaling" constant, this is basically used to help with model convergence.
-# Normal on log scale, why aren't we just using a log-normal distribution for K??
-# Priors of logK.a = 7 and logK.b =7 results in a median of around 1100, and a narrow range of potential values
-# remember logK.b is the precision on the variance, this results in a rahter narrow prior for K
-# Ranging from around 500 - 2100.
-#logK ~ dnorm(logK.a, logK.b) 
-# Exponentiate to get K back to correct scale.
-#K <- exp(logK)
 
-# Here I define priors for the growth terms, going with a log-normal for these.
-#for(t in 1:NY)
-#{
-#G ~ dlnorm(G.a,G.b)
-#GR ~ dlnorm(GR.a,GR.b)
-#}
 
 # priors for survey recruitment index, note we get get this estimate annually.
 # This is a simple uniform which basically allows for anything with our R values.
@@ -100,8 +86,7 @@ for(t in 1:NY)
 for(t in 1:NY)
 {
 
-	# Recruit biomass
-	#R[t] <- r[t] 
+
 	# Modelled fully recruited survey biomass estimate
 	Ipred[t] <- q * B[t]
 	# Modelled recruit survey biomass estimate
@@ -126,9 +111,6 @@ for(t in 1:NY)
 	sPresid[t] <- Presid[t] / sigma
 	sIresid[t] <- Iresid[t] * pow(I.precision,0.5)
 	sIRresid[t] <- IRresid[t] * pow(IR.precision,0.5)
-	#sCresid[t] <- 	Cresid[t] * pow(ikappa.tau2,0.5)
-	#sCRresid[t] <- 	CRresid[t] * pow(ikappa.rho2,0.5)
-	
 
 }
 }

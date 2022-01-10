@@ -67,7 +67,7 @@ library(R2jags)
 
 knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
 # Set the Workding directory.
-direct.proj <- "D:/Github/Fisheries_module/"
+
 
 #Some Custom Functions I'll need
 funs <- c("https://raw.githubusercontent.com/Mar-Scal/Assessment_fns/master/Maps/pectinid_projector_sf.R",
@@ -81,7 +81,6 @@ funs <- c("https://raw.githubusercontent.com/Mar-Scal/Assessment_fns/master/Maps
           "https://raw.githubusercontent.com/Dave-Keith/Fisheries_module/master/Scripts/Functions/posterior_plot.R",
           "https://raw.githubusercontent.com/Dave-Keith/Fisheries_module/master/Scripts/Functions/stretched_beta_dist_rand_num_new.R")
 
-
 # Now run through a quick loop to load each one, just be sure that your working directory is read/write!
 for(fun in funs) 
 {
@@ -90,6 +89,8 @@ for(fun in funs)
   file.remove(paste0(getwd(),"/",basename(fun)))
 }
 
+
+  
 # A couple custom functions I may or may not use
 factor.2.number <- function(x) {as.numeric(levels(x))[x]} # My friend factor.2.number
 # Function in case you need it for transforming propotion data to not have 0's and 1's.  
@@ -248,8 +249,8 @@ m.mn   <- 0.2
 g.mn   <- 1.1
 gr.mn <- 1.4
 E.mn  <- 0.15
-B <- 100000 # The initial B
-R.mn <- 25000 # The average number of recruits over time period
+B <- tot.biomass # The initial B
+R.mn <- rec.biomass # The average number of recruits over time period
 
 C <- NA # The catch
 B.tmp <- NA # Initializing the Biomass, this is an intermediate B value
@@ -583,28 +584,17 @@ mod.dat <- data.frame(I = bm.est.dat %>% dplyr::filter(metric == "Survey") %>% d
                       C = mod.actual$catch,
                       year = yrs)
 
-# Play around with the q and m priors to see how these influence your results..
-# They are both set up as beta distribution priors, so these plots help you to understand what that is.
-
-
-
-
-
-
 # Load in the model function
-direct <- getwd()
-source(paste(direct,"/Scripts/Functions/Model_function.R",sep=""))
 
-# Run the model, see the function for an explanation of all the model options.
-run_model(mod.dat = mod.dat, direct = direct,
-          jags.model = "models/delay_difference_model_base.bug",
-          nchains=6,niter = niter,nburn = 0.25*n.iter,
-          m.prior = m.prior,q.prior = q.prior
-          )
+# Don't touch these...
+r.prior = data.frame(a=rec.biomass,b=1000)
+b0.prior= data.frame(a=tot.biomass,b=0.5)
 
+# Run the model
+res <- run_model(mod.dat = mod.dat, nchains=6,niter = niter,nburn = 0.25*n.iter,
+          m.prior = m.prior,q.prior = q.prior,
+          r.prior = r.prior, b0.prior = b0.prior)
 
-load(file=paste(direct,"/Results/Lecture_3/Model_results.RData",sep=""))
-  
 mod.res <- data.frame(biomass = DD.out$median$B,
                       recruits = DD.out$median$R,
                       exploitation.rate = DD.out$median$mu,
@@ -621,23 +611,27 @@ FR.ltm <- median(DD.out$median$B[-length(DD.out$median$B)])
 rec.bm <- DD.out$median$R
 # We exclude the current year from the median estimate
 rec.ltm <- median(DD.out$median$R[-length(DD.out$median$R)])
+# Get the posterior and priors for q and M
+q.post <- data.frame(Posterior = DD.out$sims.list$q, Prior = rbeta(length(DD.out$sims.list$q),q.prior$a,q.prior$b))
+m.post <- data.frame(Posterior = DD.out$sims.list$M, Prior = rbeta(length(DD.out$sims.list$M),m.prior$a,m.prior$b))
 
 
 # Here are the main output plots that should summarize everything that needs summarized for this
-  posterior.plt(DD.out,DDpriors)
+ggplot(q.post) + geom_histogram(aes(Posterior)) + geom_freqpoly(aes(Prior)) + xlab("Catchability") + ylab("")
+ggplot(m.post) + geom_histogram(aes(Posterior)) + geom_freqpoly(aes(Prior)) + xlab("Natural Mortality") + ylab("")
+
   
+ggplot(mod.actual) + geom_line(aes(x=years,y=natural.mort),size=1.5,color='blue') + 
+                     geom_hline(aes(yintercept = DD.out$median$M),size=1.5,linetype='dashed',color='darkgrey') + theme_bw()
   
-  ggplot(mod.actual) + geom_line(aes(x=years,y=natural.mort),size=1.5,color='blue') + 
-                       geom_hline(aes(yintercept = DD.out$median$M),size=1.5,linetype='dashed',color='darkgrey') + theme_bw()
+ggplot(mod.actual) + geom_point(aes(x=years,y=biomass),size=1.5,color='blue') + 
+                     geom_line(data = mod.res,aes(y=biomass,x=years),size=1.5,color='darkgrey') + theme_bw()
   
-  ggplot(mod.actual) + geom_point(aes(x=years,y=biomass),size=1.5,color='blue') + 
-                       geom_line(data = mod.res,aes(y=biomass,x=years),size=1.5,color='darkgrey') + theme_bw()
+ggplot(mod.actual) + geom_point(aes(x=years,y=recruits),size=1.5,color='blue') + 
+                     geom_line(data = mod.res,aes(y=recruits,x=years),size=1.5,color='darkgrey') + theme_bw()
   
-  ggplot(mod.actual) + geom_point(aes(x=years,y=recruits),size=1.5,color='blue') + 
-                       geom_line(data = mod.res,aes(y=recruits,x=years),size=1.5,color='darkgrey') + theme_bw()
-  
-  ggplot(mod.actual) + geom_point(aes(x=years,y=exploitation.rate),size=1.5,color='blue') + 
-                       geom_line(data = mod.res,aes(y=exploitation.rate,x=years),size=1.5,color='darkgrey') + theme_bw()
+ggplot(mod.actual) + geom_point(aes(x=years,y=exploitation.rate),size=1.5,color='blue') + 
+                     geom_line(data = mod.res,aes(y=exploitation.rate,x=years),size=1.5,color='darkgrey') + theme_bw()
   
   
 ```

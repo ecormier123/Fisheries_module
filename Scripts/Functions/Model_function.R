@@ -62,12 +62,12 @@ run_model <- function(direct = "d:/Github/Fisheries_module", fig="screen",
                         mod.dat = mod.dat, 
                         m.prior = data.frame(a=2,b=6), 
                         q.prior =  data.frame(a=15,b=35),
-                        # The output options
-                        plot.loc = paste(direct,"Results/",sep=""),
+                        r.prior = data.frame(a=30000,b=1000),
+                        b0.prior= data.frame(a=30000,b=0.5),
                         # The main model options, these are only used if run.mod = T. (Tho the options starting with "n" could be sent to 
                         # be used with the prediction evaluation model runs if the "pe." options are not specified and run.pre.eval.model=T)
-                        nchains = 8,niter = 175000, nburn = 100000, nthin = 20,parallel = T,
-                        jags.model = "delay_difference_model_base.bug",seed = 123,parameters = NULL)
+                        nchains = 6,niter = 175000, nburn = 100000, nthin = 20,parallel = T,
+                        seed = 123,parameters = NULL)
   
 {
   
@@ -83,7 +83,7 @@ run_model <- function(direct = "d:/Github/Fisheries_module", fig="screen",
   #############  Section 1 Model#############  Section 1 Model#############  Section 1 Model#############  Section 1 Model ###########
   
   # Set the working directory for figures and tables to be output
-  plotsGo <- plot.loc
+  jags.mod <- 
   
   DD.dat <- mod.dat
   
@@ -94,19 +94,19 @@ run_model <- function(direct = "d:/Github/Fisheries_module", fig="screen",
   
   DDpriors=list(
     # survey catchability fully recruited a= shape1, b=shape2
-    q=				    list(a=q.prior$a, 	       b=q.prior$b,		       d="dbeta",	  l=1),		
+    q=				    list(a=q.prior$a, 	       b=q.prior$b,	 d="dbeta",	  l=1),		
     # process error (SD) a = min, b = max
-    sigma=			  list(a=0.1, 		         b=5,		             d="dunif",	  l=1),		
+    sigma=			  list(a=0.1, 		         b=5,		         d="dunif",	  l=1),		
     # measurement error variance survey FR a = shape, b = scale (1/rate)
     I.precision=	list(a=0.5,	             b=1,	           d="dgamma",	l=1),		
     # measurement error variance survey recruits a = shape, b = scale (1/rate)
     IR.precision=	list(a=0.5,	             b=1,            d="dgamma",	l=1),	
     # FR natural mortality, default mostly b/t 0.1-0.4
-    M=				    list(a=m.prior$a,   b=m.prior$b,		 d="dbeta",	  l=1),
+    M=				    list(a=m.prior$a,        b=m.prior$b,		 d="dbeta",	  l=1),
     # scaled recruit biomass, a= meanlog  b = sdlog
-    r=				    list(a=log(75000), 		   b=1000,	     d="dlnorm",	l=DD.lst$NY),
+    r=				    list(a=log(r.prior$a),   b=r.prior$b,    d="dlnorm",	l=DD.lst$NY),
     # initial biomass estimate
-    bs=				    list(a=log(100000), 	   b=0.5,	     d="dlnorm",	l=1)
+    bs=				    list(a=log(b0.prior$a),  b=b0.prior$b,	 d="dlnorm",	l=1)
     
   )
   
@@ -141,6 +141,13 @@ run_model <- function(direct = "d:/Github/Fisheries_module", fig="screen",
   # Now if they haven't already been selected grab the parameters you want for the model.
   ifelse(is.null(parameters) == T, parameters <- c(names(DDpriors),'B','R','mu','Imed','Ipred','IRmed','IRpred',
                                                    'sIresid','sIRresid','sPresid','Iresid','IRresid','Presid'),parameters)
+  
+  # go grab the model...
+  tmp <- "https://raw.githubusercontent.com/Dave-Keith/Fisheries_module/master/Scripts/Functions/delay_difference_model_base.bug"
+  download.file(tmp,destfile = basename(tmp))
+  loc <- paste0(getwd(),"/",basename(tmp))
+
+  
   # Run the model
   start<-Sys.time()
   ## Call to JAGS, do you want to run in parallel?
@@ -148,14 +155,14 @@ run_model <- function(direct = "d:/Github/Fisheries_module", fig="screen",
   if(parallel==F)
   {
     out <- jags(data =  c(prior.lst,DD.lst), inits = NULL,parameters.to.save = parameters,  
-                model.file = "D:/Github/Fisheries_module/Scripts/Functions/delay_difference_model_base.bug",n.chains = nchains, n.iter = niter, n.burnin = nburn, 
+                model.file = loc,n.chains = nchains, n.iter = niter, n.burnin = nburn, 
                 n.thin = nthin)
   }
   
   if(parallel==T)
   {
     out <- jags.parallel(data =  c(prior.lst,DD.lst), inits = NULL,parameters.to.save = parameters,  
-                         model.file = "D:/Github/Fisheries_module/Scripts/Functions/delay_difference_model_base.bug",n.chains = 8, n.iter = 10000, n.burnin = 1000, 
+                         model.file = loc,n.chains = 8, n.iter = 10000, n.burnin = 1000, 
                          n.thin = 20,jags.seed = seed)
   }
   # How long did that take?
@@ -169,10 +176,12 @@ run_model <- function(direct = "d:/Github/Fisheries_module", fig="screen",
   mod.out <- out
   
   
-  # Save the model results
-  save(DD.lst, DDpriors,DD.out,mod.dat,DD.dat,
-       file=paste(direct,"/Results/Lecture_3/Model_results.RData",sep=""))
-  
+  # Return the model results
+  assign("DD.lst", DD.lst, pos = 1) 
+  assign("DDpriors", DDpriors, pos = 1) 
+  assign("DD.out", DD.out, pos = 1) 
+  assign("mod.dat", mod.dat, pos = 1) 
+  assign("DD.dat", DD.dat, pos = 1) 
   
   ############# END Section 2 Model#############  END Section 2 Model#############  END Section 2 Model#############  
   ############# END Section 2 Model#############  END Section 2 Model#############  END Section 2 Model#############  
