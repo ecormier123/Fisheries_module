@@ -1,5 +1,5 @@
 ---
-title: "Model Tutorial"
+title: "Stock Assessment Tutorial"
 author: "Eura Nama"
 output:
   bookdown::word_document2:
@@ -25,20 +25,70 @@ header-includes:
   - \newcommand{\elandscape}{\end{landscape}}
 ---
 
-# Model Tutorial Project
+# Stock Assessment Model (SAM) Tutorial Project
 
-The Big Questions to Consider
+## Tutorial Overview
+# Tutorial Objectives and Overview
 
-1. How well does the survey index compare to the 'actual biomass'?
-  - Does changing the number of survey stations or the stratification (NAFO vs Random) influence this?
-  - Given these results and your experience from Lecture 2, would you recommend the NAFO or Random survey?
-  - How many stations would you recommend?
-  
-2. How well does the Stock Assessment compare to the 'actual biomass'
+1. There are 3 main components to this tutorial that you should ask me lots of questions about until you really understand what is happening!
+    
+   i.   *Simulation*
+        - This will provide us with *fake* data that was generated with set parameters and results in our *known* data to compare against
+        - The biomass of the adults and the recruits generated in these simulations is then distributed across the survey domain.
+        - You do not need to do anything for this as we have all the parameters set and this will run without you having to change anything
+      
+   ii.  *Survey Design*
+    
+         - Here we sample from the simulated data above, you can determine the number of stations to sample and the design of the survey
+         - The survey data is then used to create indices of adult Biomass and Recruits which are inputs into the Stock Assessment Model (SAM)
+      
+   iii. *Stock Assessment Model (SAM)*
+      
+         - The indices from the survey are inputted into the Stock Assessment Model to get an estimate of the model biomass
+         - Here you have control of how the model will estimate 2 of the input parameters  
+           - *Catchability (q) * and *Natural mortality (m)*.
+         - By varying these input parameters you can explore how being *wrong* about these parameters would impact your believe about the status of the stock
+
+2. Much of the heavy lifting is done behind the scenes and your goal will be to understand how changing the survey design and/or the 2 model parameter impacts the biomass estimates from our Stock Assessment Model (SAM)
+
+
+# What are we doing?
+
+A.  Today you are going to run a simple Stock Assessment Model (SAM) for the Dusky Scallop Shark (*Dustious maximus*) stock in the Gulf of Maine using a Delay Difference model 
+
+    i.  Instead of getting 1-year of data, this tutorial will automatically simulate the biomass dynamics of this stock between 1990 and 2021
+        - The simulations are used to make 'fake' real world data which we then use to understand how survey design and 
+    ii.  Using this simulated data you will design a survey to sample the biomass in the area (similar to Tutorial #2) in each year
+    iii. Then this survey data will be used in the Delay Difference Stock Assessment Model (SAM) to get an estimate of biomass for each year
+    iv.  You can vary several parameters to see how they influence the model results.
+    
+B.  The stock and the survey is the same as used in Tutorial/Lecture #2, we just have multiple years of data as part of this survey
+
+C.  For the survey design we will again have 2 variables as part of the survey design that you can control
+
+    i. You can vary the number of survey tows
+        - You have the same constraints as in Lecture 2, I'd suggest you try a low value and a high value as based on what you found in Tutorial #2
+    ii. You can decide if you want to have a *Random* or stratified survey 
+        - The only stratification option this time is using the *NAFO* sub-areas
+        
+D.  The survey indices will then be used as the inputs into the Delay Difference Stock Assessment Model (SAM). There will be two model inputs you can adjust
+
+    i. The survey *catchability prior*.  
+        - Survey catchability can be difficult to estimate in the real world, but it is a critical parameter to scale up from a survey index to a biomass index
+        - The Stock Assessment Model (SAM) requires 'prior' knowledge of what we believe survey catchability is. 
+        - In our simulation we have set catchability to be a constant at 0.3
+
+# Questions to Consider
+
+1. How well does the survey index compare to the 'actual biomass'?    
+   - Does changing the number of survey stations or the stratification (NAFO vs Random) influence this?
+   - Given these results and your experience from Lecture 2, would you recommend the NAFO or Random survey?
+   - How many stations would you recommend?
+   
+2. How well does the Stock Assessment Biomass compare to the 'actual biomass'?
 
 3. How does varying the prior on the catchability impact the Stock Assessment results?
-  - What are the consequences of being wrong about catchability?
-  
+   - What are the consequences of being wrong about catchability?
 4. How does varying the prior on natural mortality impact the Stock Assessment results?
 
 5. How do you think having a fixed natural mortality term is impacting the Stock Assessment results?
@@ -46,13 +96,19 @@ The Big Questions to Consider
 # The Tutorial Tutorial
 
 i.    Open the file "Stock_Assessment_tutorial.Rmd" in R-Studio
-ii.   On line 89 of this file you can change the number of tows used in the survey.  Default is 20 tows
-iii.  On lines 95-97 of this file you can change the underlying biomass distribution
+ii.   On line XX of this file you can change the number of tows used in the survey.  Default is 20 tows
+
+... pick it up from here dear.
+
+iii.  On lines XX-XX of this file you can change the underlying biomass distribution
       - To do this you add a # symbol at the start of the lines you do not want, and removed it from the line you do want
-iv.   You can change the number of simulations run on line 100.
+
+
+iv.   You can change the number of simulations run on line XXX
       - I suggest trying 1, 4, and 250 (this will be slow!) to see how your opinion changes with more realizations of your data.
 v.    Press the "Knit" button in the tool bar 
       - Make sure that you closed (and saved if you want to keep the results) the word document.
+
 
 
 ```{r user-inputs, echo=F,message=F, warning=F}
@@ -91,11 +147,14 @@ m.prior <- data.frame(a=7,b=55) # m = natural mortality (proportional scale, I'm
 # as a fixed number
 area.swept.m <-  10000    # somewhere in the 1000's of square meters tends to make sense here for trawl kinds of gear.  Also need to convert to km²
 # This too would have impacts on results if we had a more realistic biomass distribution scenario, but in this world we will leave it as is.
-tot.biomass <- 100000 # Could be any units, let's call it tonnes, and because of how I have this set up below this number isn't exact
+initial.biomass <- 100000 # Could be any units, let's call it tonnes, and because of how I have this set up below this number isn't exact
 rec.biomass <- 30000 # So I think it'll be easier to just assume we have a recruitment index and treat it like the biomass (but give it it a unique RF too)
+
 # Catchability could also be allowed to vary spatially, but that adds a layer of complexity that is beyond the scope of this exercise, so 
 # changing this won't really do anything other than rescale the biomass per tow and survey biomass estimates.
-catchability <- 0.3 # What proportion of the population does survey tend to catch, going to fix this at 0.3 for simplicity
+catchability.sims <- catchability <- 0.3 # What proportion of the population does survey tend to catch, we fix this value in the simulations as a single value that doesn't change over time.
+
+mean.nat.mort.sims <- m.mn   <- 0.2 # What is the average natural mortality for the population, the acutal (simulated) natural mortality varies each year in the simulations, but in our Stock Assessment Model we assume that natural mortality doesn't vary over time, so there is only 1 model estimate for natural mortality
 
 # This is for the stock assessment model itself
 niter <- 20000 # If it is taking a long time for your models to run you can reduce this number, 20000 gives good results and runs in < 20 seconds on a tricked out laptop.
@@ -233,22 +292,19 @@ nafo.strata$p.area <-nafo.strata$area/tot.area
 # Now some derived parameters based on the area we are studying and the inputs provided at the top.
 m2.to.km2 <- 1e-6 # convert from m2 to km2
 area.swept <- area.swept.m*m2.to.km2 # Convert area swept by each tow into km²
-#mn.bm.dens <- tot.biomass/tot.area# The mean biomass density in the region
 tot.towable.area <- tot.area / area.swept # This is the total possible number of tows one could do in the entire area.
-#expected.bm.per.tow <- tot.biomass/tot.area*area.swept*1000*catchability # This is what we should expect to be the biomass per tow in KG given the above inputs.
-#expect.survey.bm <- tot.biomass*catchability # This is what the biomass from the survey should be given the catchability.
 
 
 # Let's get all the parameters formatted nicely for a table so we can see them
 input.paras <- data.frame(Parameter = c("Number of Tows ", 
                                        "Catchability",
+                                       "Natural Mortality",
                                        "Area swept by a tow",
-                                       "Number of Simulations",
                                        "Survey Design"),
                          Value     = c( n.tows,
                                         catchability,
+                                        m.mn,
                                         paste(area.swept.m,"m²"),
-                                        n.sims,
                                         surv.dist))
 
 knitr::kable(input.paras,booktabs=T, caption = "A Table of your input values for the current run of your simulation")
@@ -287,11 +343,10 @@ So we have a method to generate random fields (or a bunch of them if we want) so
 ```{r B-sim, echo=F,message=F, warning=F}
 
 # Set up or parameters, this seems like a pretty stable set of parameters
-m.mn   <- 0.2
 g.mn   <- 1.1
 gr.mn <- 1.4
 E.mn  <- 0.15
-B <- tot.biomass # The initial B
+B <- initial.biomass # The initial B
 R.mn <- rec.biomass # The average number of recruits over time period
 
 C <- NA # The catch
@@ -303,9 +358,6 @@ G.samp <- betaset('st.beta',g.mn,0.005,0.5,2)
 GR.samp <- betaset('st.beta',gr.mn,0.01,1,2.5)
 
 # Now I can run some simulations....
-
-for(s in 1:n.sims)
-{
 
 R <- sample(R.samp,n.years,replace=T)
 E <- sample(E.samp,n.years,replace=T)
@@ -331,7 +383,7 @@ for(i in 1:n.years)
     
   }
 
-}}# end the for loops
+}# end the for loop
 
 mod.actual <- data.frame(biomass = B,
                          catch = C,
@@ -615,7 +667,7 @@ mod.dat <- data.frame(I = bm.est.dat %>% dplyr::filter(metric == "Survey") %>% d
 
 # Don't touch these...
 r.prior = data.frame(a=rec.biomass,b=1000)
-b0.prior= data.frame(a=tot.biomass,b=0.5)
+b0.prior= data.frame(a=initial.biomass,b=0.5)
 
 # Run the model
 res <- run_model(mod.dat = mod.dat, nchains=6,niter = niter,nburn = 0.25*niter,
@@ -634,7 +686,7 @@ mod.res$recruits[nrow(mod.res)] <- NA
 
 Priors are essentially a guide for the model to help inform likely values for the parameters. Sometimes they are well know (informative), sometimes they are not much more than an 'educated' guess.  In our example you should tweak the priors for catchability (*q*) and natural mortality (*m*) to see how these influence the estimate of both these parameters and the other parameters in the model.  You should be thinking *are their consequences to getting these wrong and if so what are they*.
 
-```{r q-m-priors-posts,echo=F,message=F,warning=F,fig.cap = "The Prior and Posterior distributions for catchability and mortality.  The Prior distribution is approximated by the line, while the model realizations (aka Posteriors) are given by the histogram (bars)"}
+```{r q-m-priors-posts,echo=F,message=F,warning=F,fig.cap = "The Prior and Posterior distributions for catchability and mortality.  The Prior distribution is approximated by the line, while the model realizations (aka Posteriors) are given by the histogram (bars). In the left figure, the blue dashed line is the catchability (q) you defined for the simulations, this is a fixed unchanging value.  In the figure on the right, the red dashed line is the average natural mortality (m) you defined, note that natural mortality varies each year in our simulations, but our Stock Assessment Model (SAM) is constrained to estimate one m for the entire time series. "}
 
 
 # Get the posterior and priors for q and M
@@ -644,8 +696,15 @@ q <- DD.out$median$q # Same as median(q.post$Posterior)
 m <- DD.out$median$M # Same as median(m.post$Posterior)
 
 # Here are the main output plots that should summarize everything that needs summarized for this
-plt.q <- ggplot(q.post) + geom_histogram(aes(Posterior)) + geom_freqpoly(aes(Prior)) + xlab("Catchability") + ylab("") + theme_bw()
-plt.m <- ggplot(m.post) + geom_histogram(aes(Posterior)) + geom_freqpoly(aes(Prior)) + xlab("Natural Mortality") + ylab("") + theme_bw()
+plt.q <- ggplot(q.post) + geom_histogram(aes(Posterior),alpha = 0.5) + 
+                          geom_freqpoly(aes(Prior)) + xlab("Catchability") + 
+                          geom_vline(aes(xintercept = catchability.sims),color='blue',size=1.,linetype = 'dashed')
+                          ylab("") + theme_bw()
+                          
+plt.m <- ggplot(m.post) + geom_histogram(aes(Posterior),alpha = 0.5) + 
+                          geom_freqpoly(aes(Prior)) + xlab("Natural Mortality") + 
+                          geom_vline(aes(xintercept = mean.nat.mort.sims),color='firebrick2',size=1.,linetype = 'dashed')
+                          ylab("") + theme_bw()
 
 post.plt <- plot_grid(plt.q,plt.m,nrow=1)
 post.plt
@@ -658,7 +717,7 @@ Here are two biomass figures.  The first is the q-corrected Model Estimated biom
 So how well is the Stock Assessment Model (SAM) doing at recreating the Survey Index?
 
 
-```{r bm-plts,echo=F,message=F,warning=F,fig.cap = "The model biomass results compared to a) the survey index biomass, here we have 'q-corrected' the Stock Assessment biomass (the grey line) and compared it to the Survey Biomass Index. In b) we have the Stock Assessment biomass (grey line) compared to the "Actual" Biomass that we simulated."}
+```{r bm-plts,echo=F,message=F,warning=F,fig.cap = "The model biomass results compared to a) the survey index biomass, here we have q-corrected the Stock Assessment biomass (the grey line) and compared it to the Survey Biomass Index. In b) we have the Stock Assessment biomass (grey line) compared to the Actual Biomass that we simulated."}
 
 plt.SA.vs.SI.bm <- ggplot(mod.dat) + geom_line(data = mod.res,aes(y=biomass*q,x=years),size=1.5,color='darkgrey') +
                                      geom_point(aes(x=year,y=I),size=1.5,color='blue') + 
