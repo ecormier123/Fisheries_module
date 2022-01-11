@@ -25,11 +25,11 @@ header-includes:
   - \newcommand{\elandscape}{\end{landscape}}
 ---
 
-# Survey Tutorial Project
+# Survey Tutorial Project Outline
 
-1. Your job is to design an annual trawl survey for Dusky Scallop Shark (*Dustious maximus*; Figure \@ref(fig:nafo-plt)). The survey occurs June when the stock is spawning.
-2. The stock area shown has been chosen as a compromise between the stock biology, stakeholder input, and operational constraints (Figure \@ref(fig:base-plt)(.
-3. In planning your survey there are 2 variables you can control
+A. Your job is to design an annual trawl survey for Dusky Scallop Shark (*Dustious maximus*; Figure \@ref(fig:nafo-plt)). The survey occurs June when the stock is spawning.
+B. The stock area shown has been chosen as a compromise between the stock biology, stakeholder input, and operational constraints (Figure \@ref(fig:base-plt)(.
+C. In planning your survey there are 2 variables you can control
     a. You can vary the number of survey tows
         - From start to finish it takes approximately 3 hours to complete a tow and finish the scientific analyses
         - The vessel is available for the entire month of June
@@ -38,7 +38,7 @@ header-includes:
           - NAFO sub-areas (Figure \@ref(fig:nafo-plt))
           - Depth strata (Figure \@ref(fig:depth-plt))
         - Note that the tows will be allocated proportionally to the area of each stratum.
-4. You can also 'simulate' different biomass distributions to see if this changes your opinion on either the stratification scheme or the number of stations you need.
+D. You can also 'simulate' different biomass distributions to see if this changes your opinion on either the stratification scheme or the number of stations you need.
     a. The "Random" option distributes the biomass using a 'random field' 
         - There is a spatial pattern to the data but the pattern is randomly generated
     b. The "NAFO" option has an underlying 'random field' which sets the pattern for each simulation
@@ -49,13 +49,13 @@ header-includes:
         - Then this field is augmented by each Depth strata
         - The biomass in deeper waters are lowered
         
-# Topics to Consider
+# Questions to Consider
 
 1. How does increasing the number of tows influence the accuracy and the precision of the results?
     - Consider the trade-offs between the number of tows and accuracy and precision of the survey results with logistical constraints of running a survey
 
 2. When you have few survey stations (e.g. ≈20) why are the stratified survey biomass estimates generally biased? 
-    - *Hint* Look at the NAFO stratification (Figure \@ref(fig:nafo-samp-plt))
+    - *Hint* Look at the number of stations in each of the NAFO stratum (Figure \@ref(fig:nafo-samp-plt))
 
 2. Consider Figure \@ref(fig:base-plt) and discuss how biological, social, economic, or political factors could influence the design of the survey of the (*D. maximus*) stock (population) in this Region.
   - *Hints*: 
@@ -66,7 +66,20 @@ header-includes:
 3. Consider Figures \@ref(fig:rand-samp-plt) - \@ref(fig:depth-samp-plt) and Table \@ref(tab:res-table). 
     - Which of the 3 sampling methods (Random, NAFO stratification, Depth stratification) would you suggest to use for the survey and why?
     - Does changing the underlying biomass distribution effect your opinion?
+
+4. How many survey stations would you recommend?
+    - Consider the 'constraints' on your available time in Part "C" of the Tutorial Outline above.
   
+# The Tutorial Tutorial
+
+i.    Open the file "Survey_tutorial.Rmd" in R-Studio
+ii.   On line 89 of this file you can change the number of tows used in the survey.  Default is 20 tows
+iii.  On lines 95-97 of this file you can change the underlying biomass distribution
+      - To do this you add a # symbol at the start of the lines you do not want, and removed it from the line you do want
+iv.   You can change the number of simulations run on line 100.
+      - I suggest trying 1, 4, and 250 (this will be slow!) to see if/how your opinion changes with more realizations of your data.
+v.    Press the "Knit" button in the tool bar 
+      - Make sure that you closed (and saved if you want to keep the results) the word document.
 
 
 <!-- Here are the parameters you should change -->
@@ -84,7 +97,7 @@ bm.dist <- bm.dist[2] # This makes the biomass distribution be a function of the
 #bm.dist <- bm.dist[3] # This makes the biomass distribution being a function of depth
 
 # This changes the number of simulations you run, I suggest trying 1, 4, and 250 (250 will be slow!) to see if it changes your opinion
-n.sims <- 9
+n.sims <- 4
 
 ```
 
@@ -309,7 +322,7 @@ base.domain<- pecjector(area="GOM",repo = 'github', plot=F,
 
 # Survey Parameters
 
-Just so you can keep track in the document, we return the survey parameters that you set for this simulation.
+Just so you can keep track in the document, we return the survey parameters that were set for this simulation.  You only have control over the Number of Tows and the underlying "Biomass distribution".  The other parameters are automatically set for you in the code.
 
 ```{r paras-table, echo=F}
 
@@ -323,9 +336,9 @@ expect.survey.bm <- tot.biomass*catchability # This is what the biomass from the
 
 
 # Let's get all the parameters formatted nicely for a table so we can see them
-parameters <- data.frame(Parameter = c("Number of Tows ", "Total Biomass", 
-                                       "Catchability","Area swept by a tow",
-                                       "Number of Simulations","Biomass distribution"),
+parameters <- data.frame(Parameter = c("Number of Tows ", "Biomass distribution",
+                                       "Total Biomass", "Catchability","Area swept by a tow",
+                                       "Number of Simulations"),
                          Value     = c(     n.tows  ,    paste(tot.biomass, 'tonnes')  , 
                                             catchability , paste(area.swept.m,"m²"),
                                             n.sims ,              bm.dist))

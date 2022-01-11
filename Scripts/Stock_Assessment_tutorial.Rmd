@@ -25,6 +25,84 @@ header-includes:
   - \newcommand{\elandscape}{\end{landscape}}
 ---
 
+# Model Tutorial Project
+
+The Big Questions to Consider
+
+1. How well does the survey index compare to the 'actual biomass'?
+  - Does changing the number of survey stations or the stratification (NAFO vs Random) influence this?
+  - Given these results and your experience from Lecture 2, would you recommend the NAFO or Random survey?
+  - How many stations would you recommend?
+  
+2. How well does the Stock Assessment compare to the 'actual biomass'
+
+3. How does varying the prior on the catchability impact the Stock Assessment results?
+  - What are the consequences of being wrong about catchability?
+  
+4. How does varying the prior on natural mortality impact the Stock Assessment results?
+
+5. How do you think having a fixed natural mortality term is impacting the Stock Assessment results?
+
+# The Tutorial Tutorial
+
+i.    Open the file "Stock_Assessment_tutorial.Rmd" in R-Studio
+ii.   On line 89 of this file you can change the number of tows used in the survey.  Default is 20 tows
+iii.  On lines 95-97 of this file you can change the underlying biomass distribution
+      - To do this you add a # symbol at the start of the lines you do not want, and removed it from the line you do want
+iv.   You can change the number of simulations run on line 100.
+      - I suggest trying 1, 4, and 250 (this will be slow!) to see how your opinion changes with more realizations of your data.
+v.    Press the "Knit" button in the tool bar 
+      - Make sure that you closed (and saved if you want to keep the results) the word document.
+
+
+```{r user-inputs, echo=F,message=F, warning=F}
+
+# You can set the number of stations...
+n.tows <- 200
+
+# How do you want to set up the survey, Random Stratified or NAFO stratified
+surv.dist <- c("Random","NAFO") 
+# How do you want to set up your survey [1] will use the Random Survey, [2] will be NAFO survey
+# Just comment and uncomment to shift between the options
+#surv.dist <- surv.dist[1] # This is a random survey
+surv.dist <- surv.dist[2] # This is a stratified survey using NAFO
+
+# Set your priors for q and m, you will get a plot showing the properties of this prior in the output. 
+q.prior <- data.frame(a=15,b=35) # q = catchability
+m.prior <- data.frame(a=7,b=55) # m = natural mortality (proportional scale, I'm using M to be instantaneous rate)
+# Quick guide... if a < b your median for the prior will be < 0.5, if a = b it'll be around 0.5, if a > b it'll be > 0.5
+# the a/b ratio controls distance from 0.5.  
+# The size of a and b controls the width of the distributions, if a and b are low you get a very wide distributions
+# If a and b are high you get more narrow distributions.  
+#Play around with this command to experiment on different shapes of the beta distribution if interested
+#hist(rbeta(10000,5,1))
+
+
+```
+
+
+<!-- These parameters could also be changed if you'd like to do additional exploration, but isn't part of the core assignment here -->
+
+
+```{r other-parameters, echo=F}
+
+# You can change the area that is covered by each survey tow. This value is in m². The default value of 10,000 is equivalent to a 2 km survey tow that is 5 meters wide
+# Changing this won't have as much impact as it might in real world as simulation of real world variability in densities would take hours, so we leave it 
+# as a fixed number
+area.swept.m <-  10000    # somewhere in the 1000's of square meters tends to make sense here for trawl kinds of gear.  Also need to convert to km²
+# This too would have impacts on results if we had a more realistic biomass distribution scenario, but in this world we will leave it as is.
+tot.biomass <- 100000 # Could be any units, let's call it tonnes, and because of how I have this set up below this number isn't exact
+rec.biomass <- 30000 # So I think it'll be easier to just assume we have a recruitment index and treat it like the biomass (but give it it a unique RF too)
+# Catchability could also be allowed to vary spatially, but that adds a layer of complexity that is beyond the scope of this exercise, so 
+# changing this won't really do anything other than rescale the biomass per tow and survey biomass estimates.
+catchability <- 0.3 # What proportion of the population does survey tend to catch, going to fix this at 0.3 for simplicity
+
+# This is for the stock assessment model itself
+niter <- 20000 # If it is taking a long time for your models to run you can reduce this number, 20000 gives good results and runs in < 20 seconds on a tricked out laptop.
+
+
+```
+
 
 ```{r setup, include=FALSE,echo=F, message=F,warning=F,cache=F}
 options(scipen = 999) # Just forces numbers to not be in scientific notiation
@@ -101,6 +179,9 @@ nsplit = function(X,n)
   p = X/sum(X)
   diff(round(n*cumsum(c(0,p))))
 }
+# Set the theme for the plots
+theme_set(theme_bw())
+
 # Now I want to make a bounding box that outlines our study area
 survey.domain <- st_as_sf(data.frame(X = c(465000, 750000, 750000, 650000, 600000, 400000),
                                     Y = c(4450000,4450000,4710000,4900000,4860000,4800000),ID=1),coords = c("X","Y"),crs= 32619)
@@ -145,46 +226,7 @@ nafo.strata$p.area <-nafo.strata$area/tot.area
 
 ```
 
-```{r user-inputs, echo=F,message=F, warning=F}
 
-# You can set the number of stations...
-n.tows <- 20
-
-# How do you want to set up the survey, Random Stratified or NAFO stratified
-surv.dist <- c("Random","NAFO") 
-# Which Biomass distribution do you want [1] will be Random Survey, 2 will be NAFO survey, and 3 will be "Depth
-# Just comment and uncomment to shift between the options
-#surv.dist <- surv.dist[1] # This is a random survey
-surv.dist <- surv.dist[2] # This is a stratified survey using NAFO
-
-# This changes the number of biomass simulations you run, I suggest trying 1, 4, and 250 (250 will be slow!) to see if it changes your opinion
-n.sims <- 9
-
-# You can change the area that is covered by each survey tow. This value is in m². The default value of 10,000 is equivalent to a 2 km survey tow that is 5 meters wide
-# Changing this won't have as much impact as it might in real world as simulation of real world variability in densities would take hours, so we leave it 
-# as a fixed number
-area.swept.m <-  10000    # somewhere in the 1000's of square meters tends to make sense here for trawl kinds of gear.  Also need to convert to km²
-# This too would have impacts on results if we had a more realistic biomass distribution scenario, but in this world we will leave it as is.
-tot.biomass <- 100000 # Could be any units, let's call it tonnes, and because of how I have this set up below this number isn't exact
-rec.biomass <- 30000 # So I think it'll be easier to just assume we have a recruitment index and treat it like the biomass (but give it it a unique RF too)
-# Catchability could also be allowed to vary spatially, but that adds a layer of complexity that is beyond the scope of this exercise, so 
-# changing this won't really do anything other than rescale the biomass per tow and survey biomass estimates.
-catchability <- 0.3 # What proportion of the population does survey tend to catch, going to fix this at 0.3 for simplicity
-
-
-# Set your priors for q and m, you will get a plot showing the properties of this prior in the output. 
-q.prior <- data.frame(a=15,b=35)
-m.prior <- data.frame(a=7,b=55)
-# Quick guide... if a < b your mode for the prior will be < 0.5, if a = b it'll be around 0.5, if a > b it'll be > 0.5
-# the a/b ratio controls distance from 0.5.  
-# The size of a and b controls the width of the distributions, if a and b are low you get a very wide distributions
-# If a and b are high you get more narrow distributions.  
-#Play around with this command to experiment on different shapes of the beta distribution  
-#hist(rbeta(10000,5,1))
-
-niter <- 2000 # When initially exploring your results, keep this around 2000 so the model runs quickly, increase to 20000 for final runs of your models
-
-```
 
 ```{r paras-table, echo=F}
 
@@ -350,7 +392,7 @@ rec.res <- gmrfs.rec
 # gmrfs.rec %>% dplyr::group_by(years) %>% dplyr::summarize(sum = sum(biomass.cell))
 ```
 
-So now we should sample from our area. Given last weeks results we will use both a random sample of the area each year and a stratified survey using the NAFO grid.  Let's see if one does better than the other at this.
+<!-- So now we should sample from our area. Given last weeks results we will use both a random sample of the area each year and a stratified survey using the NAFO grid.  Let's see if one does better than the other at this. -->
 
 ```{r sample-B, echo=F,message=F, warning=F}
 
@@ -552,39 +594,24 @@ samp.bm.dat <- do.call("rbind",samp.bm.tmp)
 samp.rec.dat <- do.call("rbind",samp.bm.tmp)
 bm.est.dat <- do.call("rbind",bm.est.tmp)
 rec.est.dat <- do.call("rbind",rec.est.tmp)
-# Note that we can get negative values for the LCI because we are assuming the bm.per.tow is normally distributed.  These are truncated to 0's here.
+# Note that we can get negative values for the LCI because we are assuming the bm.per.tow is normally distributed.  These are truncated to 0's here...
+# There are way better ways to deal with this (e.g. log-normal, but that distro is a pain...)
 bm.est.dat$lci[bm.est.dat$lci <0] <- 0
 
 ```
 
-The final? step is to take the survey results and then plug those into a model to see how we do.  We can estimate biomass, but we don't actually have
-any real data on catchability, recruitment, natural mortality, or growth rates, so we have to make assumptions about those.  All we really know is
-biomass and removals.
+<!-- Now we have all our model inputs so we can run the Stock Assessment Model -->
 
 
-```{r mod-priors,echo=F,message=F,warning=F,fig.cap = "The Prior distributions for catchability and mortality"}
+```{r SA-model, echo=F,message=F, warning=F}
 
-
-priors <- data.frame(res = c(rbeta(10000,q.prior$a,q.prior$b),rbeta(10000,m.prior$a,m.prior$b)),
-                     dist = c(rep("Catchibility Prior",10000),rep("Natural Mortality Prior",10000)))
-
-# Now make a plot of the priors
-plt.pr <- ggplot(priors) + geom_freqpoly(aes(x= res)) + facet_wrap(~dist) + theme_bw()
-plt.pr
-
-```
-
-
-```{r mod-params, echo=F,message=F, warning=F}
-
+# Get the model data into the format needed for the model
 mod.dat <- data.frame(I = bm.est.dat %>% dplyr::filter(metric == "Survey") %>% dplyr::select(biomass) %>% unname(), 
                       IR = rec.est.dat %>% dplyr::filter(metric == "Survey") %>% dplyr::select(biomass) %>% unname(),
                       G = mod.actual$growth.adults,
                       GR = mod.actual$growth.recruits,
                       C = mod.actual$catch,
                       year = yrs)
-
-# Load in the model function
 
 # Don't touch these...
 r.prior = data.frame(a=rec.biomass,b=1000)
@@ -595,43 +622,70 @@ res <- run_model(mod.dat = mod.dat, nchains=6,niter = niter,nburn = 0.25*niter,
           m.prior = m.prior,q.prior = q.prior,
           r.prior = r.prior, b0.prior = b0.prior)
 
+# Take the median from the distributions generated in our model.  Going to ignore uncertainty for this as that feels a bridge to far for one lecture
 mod.res <- data.frame(biomass = DD.out$median$B,
                       recruits = DD.out$median$R,
                       exploitation.rate = DD.out$median$mu,
                       years = yrs)
+# The last year of recruits isn't really a thing as it isn't used in the model anywhere so we won't show it.
+mod.res$recruits[nrow(mod.res)] <- NA
 
-# Some model outputs needed for the Update.  First the mortality
-mort <- 1- exp(-DD.out$mean$m)
+```
 
-  # Here we can grab the Fully recruited and recruit biomass for the last 2 years and the median of the time series.
-FR.bm <- DD.out$median$B
-# We exclude the current year from the median estimate
-FR.ltm <- median(DD.out$median$B[-length(DD.out$median$B)])
-# Recruit biomass
-rec.bm <- DD.out$median$R
-# We exclude the current year from the median estimate
-rec.ltm <- median(DD.out$median$R[-length(DD.out$median$R)])
+Priors are essentially a guide for the model to help inform likely values for the parameters. Sometimes they are well know (informative), sometimes they are not much more than an 'educated' guess.  In our example you should tweak the priors for catchability (*q*) and natural mortality (*m*) to see how these influence the estimate of both these parameters and the other parameters in the model.  You should be thinking *are their consequences to getting these wrong and if so what are they*.
+
+```{r q-m-priors-posts,echo=F,message=F,warning=F,fig.cap = "The Prior and Posterior distributions for catchability and mortality.  The Prior distribution is approximated by the line, while the model realizations (aka Posteriors) are given by the histogram (bars)"}
+
+
 # Get the posterior and priors for q and M
 q.post <- data.frame(Posterior = DD.out$sims.list$q, Prior = rbeta(length(DD.out$sims.list$q),q.prior$a,q.prior$b))
 m.post <- data.frame(Posterior = DD.out$sims.list$M, Prior = rbeta(length(DD.out$sims.list$M),m.prior$a,m.prior$b))
-
+q <- DD.out$median$q # Same as median(q.post$Posterior)
+m <- DD.out$median$M # Same as median(m.post$Posterior)
 
 # Here are the main output plots that should summarize everything that needs summarized for this
-ggplot(q.post) + geom_histogram(aes(Posterior)) + geom_freqpoly(aes(Prior)) + xlab("Catchability") + ylab("")
-ggplot(m.post) + geom_histogram(aes(Posterior)) + geom_freqpoly(aes(Prior)) + xlab("Natural Mortality") + ylab("")
+plt.q <- ggplot(q.post) + geom_histogram(aes(Posterior)) + geom_freqpoly(aes(Prior)) + xlab("Catchability") + ylab("") + theme_bw()
+plt.m <- ggplot(m.post) + geom_histogram(aes(Posterior)) + geom_freqpoly(aes(Prior)) + xlab("Natural Mortality") + ylab("") + theme_bw()
 
+post.plt <- plot_grid(plt.q,plt.m,nrow=1)
+post.plt
+
+```
+
+
+Here are two biomass figures.  The first is the q-corrected Model Estimated biomass compared to the survey biomass index.  The second is the Stock Assessment estimated biomass compared to the Actual simulated biomass. **Recall, the Actual simulated biomass would be 'unknown' in a real world Stock Assessment, here it is a check of how well our models have done**.  
+
+So how well is the Stock Assessment Model (SAM) doing at recreating the Survey Index?
+
+
+```{r bm-plts,echo=F,message=F,warning=F,fig.cap = "The model biomass results compared to a) the survey index biomass, here we have 'q-corrected' the Stock Assessment biomass (the grey line) and compared it to the Survey Biomass Index. In b) we have the Stock Assessment biomass (grey line) compared to the "Actual" Biomass that we simulated."}
+
+plt.SA.vs.SI.bm <- ggplot(mod.dat) + geom_line(data = mod.res,aes(y=biomass*q,x=years),size=1.5,color='darkgrey') +
+                                     geom_point(aes(x=year,y=I),size=1.5,color='blue') + 
+                                     xlab("")+ ylab("Biomass Index (tonnes)")
   
+plt.SA.vs.Act.bm <- ggplot(mod.actual) + geom_line(data = mod.res,aes(y=biomass,x=years),size=1.5,color='darkgrey') +
+                                         geom_point(aes(x=years,y=biomass),size=1.5,color='blue') + 
+                                         xlab('') + ylab("Biomass (tonnes)") + theme_bw()
+bm.plts <- plot_grid(plt.SA.vs.SI.bm,plt.SA.vs.Act.bm,nrow=1)
+bm.plts
+
+```
+
+
+
+```{r under-construction}
 ggplot(mod.actual) + geom_line(aes(x=years,y=natural.mort),size=1.5,color='blue') + 
                      geom_hline(aes(yintercept = DD.out$median$M),size=1.5,linetype='dashed',color='darkgrey') + theme_bw()
   
-ggplot(mod.actual) + geom_point(aes(x=years,y=biomass),size=1.5,color='blue') + 
-                     geom_line(data = mod.res,aes(y=biomass,x=years),size=1.5,color='darkgrey') + theme_bw()
+ggplot(mod.actual) + geom_line(data = mod.res,aes(y=biomass,x=years),size=1.5,color='darkgrey') +
+                     geom_point(aes(x=years,y=biomass),size=1.5,color='blue') + theme_bw()
   
-ggplot(mod.actual) + geom_point(aes(x=years,y=recruits),size=1.5,color='blue') + 
-                     geom_line(data = mod.res,aes(y=recruits,x=years),size=1.5,color='darkgrey') + theme_bw()
+ggplot(mod.actual) + geom_line(data = mod.res,aes(y=recruits,x=years),size=1.5,color='darkgrey') +
+                     geom_point(aes(x=years,y=recruits),size=1.5,color='blue') + 
+                     theme_bw()
   
-ggplot(mod.actual) + geom_point(aes(x=years,y=exploitation.rate),size=1.5,color='blue') + 
-                     geom_line(data = mod.res,aes(y=exploitation.rate,x=years),size=1.5,color='darkgrey') + theme_bw()
-  
-  
+ggplot(mod.actual) +  geom_line(data = mod.res,aes(y=exploitation.rate,x=years),size=1.5,color='darkgrey') + 
+                      geom_point(aes(x=years,y=exploitation.rate),size=1.5,color='blue') + 
+                      theme_bw()
 ```

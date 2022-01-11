@@ -141,19 +141,20 @@ run_model <- function(mod.dat = mod.dat,
   # Run the model
   start<-Sys.time()
   ## Call to JAGS, do you want to run in parallel?
-  
+  n.iter <- niter
+  n.burn <- nburn
   if(parallel==F)
   {
     out <- jags(data =  c(prior.lst,DD.lst), inits = NULL,parameters.to.save = parameters,  
-                model.file = loc,n.chains = nchains, n.iter = niter, n.burnin = nburn, 
-                n.thin = nthin)
+                model.file = loc,n.chains = nchains, n.iter = niter, n.burnin = n.burn, 
+                n.thin = 10)
   }
   
   if(parallel==T)
   {
     out <- jags.parallel(data =  c(prior.lst,DD.lst), inits = NULL,parameters.to.save = parameters,  
-                         model.file = loc,n.chains = 8, n.iter = 10000, n.burnin = 1000, 
-                         n.thin = 20,jags.seed = seed)
+                         model.file = loc,n.chains = 8, n.iter = n.iter, n.burnin = n.burn, 
+                         n.thin = 10,jags.seed = seed)
   }
   # How long did that take?
   print(Sys.time()-start)
