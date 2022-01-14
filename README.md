@@ -1,18 +1,26 @@
 # Dalhousie Fisheries Module
 
 
-## To Do before first class
+### To do before first class
 
-You will need to have [[R](https://cran.r-project.org/)] installed.
+1.  Install the program [[R](https://cran.r-project.org/)], there are options for Windows, Mac, and Linux users.  
+2.  Install the program [R-studio](https://www.rstudio.com/products/rstudio/download/#download).  Again there are options for Windows, Mac, and Linux users.  
+3.  Install the program [JAGS](https://sourceforge.net/projects/mcmc-jags/files/JAGS/4.x/), select version 4.3.  Again there are options for Windows, Mac, and Linux users.
 
 
-## you will need a wack of packages installed. So copy, paste, and run the below code in to make sure you have the packages you need installed.
+### Once you have these programs installed
 
+1.  Open Rstudio  
+    - RStudio is a Graphical User Interface (GUI) that makes using R much more intuitive.  
+2.  In RStudio you will need to install a number of *packages*.  
+    - *Packages* are additional tools that are developed by R users and they broaden the scope of what you can do within R.  
+3.  The code needed to install these packages is given below
+    - Simply copy this code and paste it into the *Console* window in R, (hit enter if it doesn't run immediately).
+    - Lots of things you don't need to worry about will start flashing across your screen as the installation moves forward.
+4.  If you already use R, still run the below code, it will skip over any packages you already have installed and simply install the packages you need for the course
 
 ```r
-req.packages <- c("tidyverse","dplyr","sf","units","cowplot","knitr",'ggthemes',"marmap","RandomFields",
-                  "ggplot2","stars","tmaptools","rnaturalearth","rnaturalearthdata","raster","rgdal","RStoolbox",
-                  "pals","ggnewscale","ggspatial",'devtools','raster','bookdown','tinytex','gridExtra','scales')
+req.packages <- c("tidyverse","dplyr","sf","units","cowplot","knitr",'ggthemes',"marmap","RandomFields","RCurl",'readr','s2','plotly',"ggplot2","stars","tmaptools","maptools","rnaturalearth","rnaturalearthdata","raster","rgdal","RStoolbox","pals","ggnewscale","ggspatial",'devtools','raster','bookdown','gridExtra','scales','matlab','R2jags','RandomFields')
 # If you don't have the packages install them + give a heads up that you are
 new.packages <- req.packages[!(req.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)>0) 
@@ -22,22 +30,11 @@ if(length(new.packages)>0)
   #if(tolower(wanna.install) == 'y') 
   install.packages(new.packages,repos = "http://cran.us.r-project.org") #else { stop("You didn't want to install the packages so this script does not work.")}
 }
-```
+# This is needed for our maps.
+devtools::install_github('ropensci/rnaturalearthhires')
 
-While not 100% necessary, it will be handy to have tinytext fully installed, so run the below line once you have successfully installed the above packages.
-
-```r
-
+# You may/maynot need tinytex(), but once the above installations finsish, I'm suggesting that you install it.
 tinytex::install_tinytex()
 # to uninstall TinyTeX, run tinytex::uninstall_tinytex() 
-```
-
-## R Installation
-
-You can also embed plots, for example:
-
-```r
 
 ```
-
-

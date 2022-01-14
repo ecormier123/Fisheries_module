@@ -27,28 +27,21 @@ header-includes:
 
 # Stock Assessment Model (SAM) Tutorial Project
 
-## Tutorial Overview
 # Tutorial Objectives and Overview
 
 1. There are 3 main components to this tutorial that you should ask me lots of questions about until you really understand what is happening!
-    
    i.   *Simulation*
         - This will provide us with *fake* data that was generated with set parameters and results in our *known* data to compare against
-        - The biomass of the adults and the recruits generated in these simulations is then distributed across the survey domain.
+        - The biomass of the adults and the recruits generated in this simulation is then distributed across the survey domain.
         - You do not need to do anything for this as we have all the parameters set and this will run without you having to change anything
-      
    ii.  *Survey Design*
-    
          - Here we sample from the simulated data above, you can determine the number of stations to sample and the design of the survey
          - The survey data is then used to create indices of adult Biomass and Recruits which are inputs into the Stock Assessment Model (SAM)
-      
    iii. *Stock Assessment Model (SAM)*
-      
          - The indices from the survey are inputted into the Stock Assessment Model to get an estimate of the model biomass
          - Here you have control of how the model will estimate 2 of the input parameters  
            - *Catchability (q) * and *Natural mortality (m)*.
          - By varying these input parameters you can explore how being *wrong* about these parameters would impact your believe about the status of the stock
-
 2. Much of the heavy lifting is done behind the scenes and your goal will be to understand how changing the survey design and/or the 2 model parameter impacts the biomass estimates from our Stock Assessment Model (SAM)
 
 
@@ -57,7 +50,7 @@ header-includes:
 A.  Today you are going to run a simple Stock Assessment Model (SAM) for the Dusky Scallop Shark (*Dustious maximus*) stock in the Gulf of Maine using a Delay Difference model 
 
     i.  Instead of getting 1-year of data, this tutorial will automatically simulate the biomass dynamics of this stock between 1990 and 2021
-        - The simulations are used to make 'fake' real world data which we then use to understand how survey design and 
+        - The simulation is used to make 'fake' real world data which we then use to understand how survey design and 
     ii.  Using this simulated data you will design a survey to sample the biomass in the area (similar to Tutorial #2) in each year
     iii. Then this survey data will be used in the Delay Difference Stock Assessment Model (SAM) to get an estimate of biomass for each year
     iv.  You can vary several parameters to see how they influence the model results.
@@ -97,41 +90,44 @@ D.  The survey indices will then be used as the inputs into the Delay Difference
 
 i.    Open the file "Stock_Assessment_tutorial.Rmd" in R-Studio
 ii.   On line XX of this file you can change the number of tows used in the survey.  Default is 20 tows
-
-... pick it up from here dear.
-
-iii.  On lines XX-XX of this file you can change the underlying biomass distribution
-      - To do this you add a # symbol at the start of the lines you do not want, and removed it from the line you do want
-
-
-iv.   You can change the number of simulations run on line XXX
-      - I suggest trying 1, 4, and 250 (this will be slow!) to see how your opinion changes with more realizations of your data.
-v.    Press the "Knit" button in the tool bar 
+iii.  On line XX-YY of this file you can change the survey stratification scheme, options are "Random" and "NAFO"
+iv.   On line XX of this file you can change the number of times you simulate the Biomass time series and subsequent survey sampling
+v.    On line XX of this file you can change the *Catchability Prior* to see how this influences the SAM results
+vi.   On line XX of this file you can chnage the *Natural mortality Prior* to see how this influences the SAM results
+vii.  Press the "Knit" button in the tool bar 
       - Make sure that you closed (and saved if you want to keep the results) the word document.
+
+
 
 
 
 ```{r user-inputs, echo=F,message=F, warning=F}
 
 # You can set the number of stations...
-n.tows <- 200
+n.tows <- 20
 
 # How do you want to set up the survey, Random Stratified or NAFO stratified
-surv.dist <- c("Random","NAFO") 
-# How do you want to set up your survey [1] will use the Random Survey, [2] will be NAFO survey
-# Just comment and uncomment to shift between the options
-#surv.dist <- surv.dist[1] # This is a random survey
-surv.dist <- surv.dist[2] # This is a stratified survey using NAFO
+#Just comment and uncomment to shift between the options
+#surv.dist <-"Random" # This is a random survey
+surv.dist <- "NAFO" # This is a stratified survey using NAFO boundaries as the stratification scheme
+
+# As with Lecture 2, we can repeated sample the area to understand how changing the above impacts our survey index estimates of the actual Simulated Biomass
+# As with Tutorial #2, I suggest you try 1,5, and 25 realizations (go get a coffee when you run 25 times!)
+n.realizations <- 25
+
+# Parameters to tweak for the Delay Difference Stock Assessment Model (SAM)
 
 # Set your priors for q and m, you will get a plot showing the properties of this prior in the output. 
 q.prior <- data.frame(a=15,b=35) # q = catchability
+#q.prior <- data.frame(a=45,b=35) # Here is an alternative you can try for catchability prior
 m.prior <- data.frame(a=7,b=55) # m = natural mortality (proportional scale, I'm using M to be instantaneous rate)
+#m.prior <- data.frame(a=40,b=55) # Here is an  alternative you can try for the natural mortality prior
 # Quick guide... if a < b your median for the prior will be < 0.5, if a = b it'll be around 0.5, if a > b it'll be > 0.5
 # the a/b ratio controls distance from 0.5.  
 # The size of a and b controls the width of the distributions, if a and b are low you get a very wide distributions
 # If a and b are high you get more narrow distributions.  
-#Play around with this command to experiment on different shapes of the beta distribution if interested
-#hist(rbeta(10000,5,1))
+#Play around with this command to experiment with different shapes of the beta distribution if interested
+#hist(rbeta(10000,40,55))
 
 
 ```
@@ -148,7 +144,7 @@ m.prior <- data.frame(a=7,b=55) # m = natural mortality (proportional scale, I'm
 area.swept.m <-  10000    # somewhere in the 1000's of square meters tends to make sense here for trawl kinds of gear.  Also need to convert to km²
 # This too would have impacts on results if we had a more realistic biomass distribution scenario, but in this world we will leave it as is.
 initial.biomass <- 100000 # Could be any units, let's call it tonnes, and because of how I have this set up below this number isn't exact
-rec.biomass <- 30000 # So I think it'll be easier to just assume we have a recruitment index and treat it like the biomass (but give it it a unique RF too)
+rec.biomass <- 30000 # This is approximately the average number of recruits over the time series, but it varies randomly year over year.
 
 # Catchability could also be allowed to vary spatially, but that adds a layer of complexity that is beyond the scope of this exercise, so 
 # changing this won't really do anything other than rescale the biomass per tow and survey biomass estimates.
@@ -297,15 +293,19 @@ tot.towable.area <- tot.area / area.swept # This is the total possible number of
 
 # Let's get all the parameters formatted nicely for a table so we can see them
 input.paras <- data.frame(Parameter = c("Number of Tows ", 
-                                       "Catchability",
-                                       "Natural Mortality",
+                                       "Simulated Catchability",
+                                       "Mean Simulated Natural Mortality",
                                        "Area swept by a tow",
-                                       "Survey Design"),
+                                       "Survey Design",
+                                       "Mean of Catchability Prior",
+                                       "Mean of Natural Mortality Prior"),
                          Value     = c( n.tows,
                                         catchability,
                                         m.mn,
                                         paste(area.swept.m,"m²"),
-                                        surv.dist))
+                                        surv.dist,
+                                        signif(mean(rbeta(10000,q.prior$a,q.prior$b)),digits =2),
+                                        signif(mean(rbeta(10000,m.prior$a,m.prior$b)),digits = 2)))
 
 knitr::kable(input.paras,booktabs=T, caption = "A Table of your input values for the current run of your simulation")
 ```
@@ -315,6 +315,7 @@ knitr::kable(input.paras,booktabs=T, caption = "A Table of your input values for
 ```{r rand-field,echo=F,message=F,warning=F}
 # So there are 1399 points, so this returns it all in one big smoogle that we need to extract ourselves.
 # It appears that there is some auto-regressive component to the field as there is correlation through time.
+# This step is slow, so I'm only going to do the one realization of the random field rather than remake the field for each simulation
 yrs <- 1990:2021
 n.years <- length(yrs)
 
@@ -338,7 +339,7 @@ st_crs(rec.gmrfs.sf) <- 4326
 ```
 
 
-So we have a method to generate random fields (or a bunch of them if we want) so now I want to make our model
+<!-- So we have a method to generate random fields so now I want to generate the 'real' biomass time series used for the analysis -->
 
 ```{r B-sim, echo=F,message=F, warning=F}
 
@@ -349,20 +350,20 @@ E.mn  <- 0.15
 B <- initial.biomass # The initial B
 R.mn <- rec.biomass # The average number of recruits over time period
 
+
 C <- NA # The catch
 B.tmp <- NA # Initializing the Biomass, this is an intermediate B value
+# Here we generate a distribution of data we can sample from using various distributions
 R.samp <- betaset('st.beta',R.mn,R.mn^2,0,1e6)
 m.samp <- betaset('beta',m.mn,0.005,0.1,0.4)
 E.samp <- betaset('beta',E.mn,0.005,0.1,0.4)
 G.samp <- betaset('st.beta',g.mn,0.005,0.5,2)
 GR.samp <- betaset('st.beta',gr.mn,0.01,1,2.5)
 
-# Now I can run some simulations....
-
+# Now we sample from the above distributions to get estimates of these variables for each year.
 R <- sample(R.samp,n.years,replace=T)
 E <- sample(E.samp,n.years,replace=T)
 M <- sample(m.samp,n.years,replace=T)
-
 G <- sample(G.samp,n.years,replace=T)
 GR <- sample(GR.samp,n.years,replace=T)
 
@@ -377,14 +378,15 @@ for(i in 1:n.years)
     
   if(i > 1)
   {
+    # Here is the Delay Difference model, using the above inputs
     B.tmp[i] <- (B[i-1])*exp(-M[i])*G[i] + R[i-1]*exp(-M[i])*GR[i]
-    C[i] <-  B.tmp[i] * E[i]
-    B[i] <- B.tmp[i] -C[i]
+    C[i] <-  B.tmp[i] * E[i] # This gets our actual catch
+    B[i] <- B.tmp[i] -C[i] # This gets our actual biomass (after the fishery catch is removed)
     
   }
 
 }# end the for loop
-
+# And save the output
 mod.actual <- data.frame(biomass = B,
                          catch = C,
                          exploitation.rate = E,
@@ -392,16 +394,23 @@ mod.actual <- data.frame(biomass = B,
                          growth.adults = G,
                          recruits  = R,
                          growth.recruits = GR,
-                         years = yrs
-                         )
+                         years = yrs)
+
 
 ```
 
-Here I am distributing the biomass across the area according to the GMRF. 
 
-```{r B-distribute, echo=F,message=F, warning=F}
+```{r B-distribute, echo=F, message=FALSE, warning=FALSE}
+# Here we are distributing the biomass across the area according to the Gaussian Markov Random Field 
 
+surv.dat <- NULL
+samp.bm.dat <- NULL
+samp.rec.dat <- NULL
+bm.est.dat <- NULL
+rec.est.dat <- NULL
 
+for(s in 1:n.realizations)
+{
 # Get the biomass distribution across the area
 bm.dat <- data.frame(years = yrs, 
                      tot.biomass = mod.actual$biomass,mn.bm.dens = mod.actual$biomass/tot.area)
@@ -434,20 +443,12 @@ gmrfs.rec <- gmrfs.rec %>% dplyr::group_by(years) %>% dplyr::mutate(tmp.biomass 
 gmrfs.rec$biomass.cell <- gmrfs.rec$biomass.cell*gmrfs.rec$tot.biomass/gmrfs.rec$tmp.biomass
 gmrfs.rec$bm.dens <- gmrfs.rec$biomass.cell/gmrfs.rec$grid.area
 
-
 bm.res <- gmrfs.bm
 rec.res <- gmrfs.rec
 
-# ggplot(gmrfs.rec) + geom_sf(aes(fill = bm.dens,color=bm.dens)) + scale_fill_viridis_b() + scale_color_viridis_b() + facet_wrap(~years)
-# ggplot(gmrfs.rec) + geom_sf(aes(fill = variable1,color=variable1)) + scale_fill_viridis_b() + scale_color_viridis_b() + facet_wrap(~years)
-# ggplot(gmrfs.bm) + geom_histogram(aes(x=bm.dens))  + facet_wrap(~years)
-# gmrfs.rec %>% dplyr::group_by(years) %>% dplyr::summarize(sum = sum(biomass.cell))
-```
 
-<!-- So now we should sample from our area. Given last weeks results we will use both a random sample of the area each year and a stratified survey using the NAFO grid.  Let's see if one does better than the other at this. -->
-
-```{r sample-B, echo=F,message=F, warning=F}
-
+# So now we should sample from our area. Given last weeks results we will use both a random sample of the area each year and a stratified survey using the NAFO grid.  
+#Let's see if one does better than the other at this.
 
 samp.bm.tmp <- NULL
 samp.rec.tmp <- NULL
@@ -517,10 +518,10 @@ for(i in 1:n.years)
                            uci = c(max(ci.per.tow),max(ci.tot),max(ci.tot.q.cor)),
                            metric = c("Per Tow","Survey","Q-Corrected"),
                            survey = rep('NAFO Strata',3),
-                           simulation = rep(i,3),
+                           simulation = rep(s,3),
                            years = yrs[i])
     # Now do the same thing to get the recruit biomass estimates from the survey
-    samp.rec.tmp[[i]] <- st_join(samp.rec.tmp[[i]],bm.tmp %>% dplyr::select(!strata))
+    samp.rec.tmp[[i]] <- st_join(samp.rec.tmp[[i]],rec.tmp %>% dplyr::select(!strata))
     
     samp.rec.tmp[[i]]$sample.bm.per.tow <- rlnorm(n.tows,log(catchability*samp.rec.tmp[[i]]$bm.dens*area.swept*1000),0.25)
     # Biomass density in kg/km^2
@@ -559,7 +560,7 @@ for(i in 1:n.years)
                            uci = c(max(ci.per.tow),max(ci.tot),max(ci.tot.q.cor)),
                            metric = c("Per Tow","Survey","Q-Corrected"),
                            survey = rep('NAFO Strata',3),
-                           simulation = rep(i,3),
+                           simulation = rep(s,3),
                            years = yrs[i])
   } # end if "NAFO"
   
@@ -600,7 +601,7 @@ for(i in 1:n.years)
                            uci = c(max(ci.per.tow),max(ci.tot),max(ci.tot.q.cor)),
                            metric = c("Per Tow","Survey","Q-Corrected"),
                            survey = rep('Random',3),
-                           simulation = rep(i,3),
+                           simulation = rep(s,3),
                            years = yrs[i])
     
     
@@ -634,38 +635,39 @@ for(i in 1:n.years)
                            uci = c(max(ci.per.tow),max(ci.tot),max(ci.tot.q.cor)),
                            metric = c("Per Tow","Survey","Q-Corrected"),
                            survey = rep('Random',3),
-                           simulation = rep(i,3),
+                           simulation = rep(s,3),
                            years = yrs[i])
     
   } # End if == "Random"
+} # end the Years for loop
 
-}
-
-surv.dat <- do.call("rbind",surv.tmp)
-samp.bm.dat <- do.call("rbind",samp.bm.tmp)
-samp.rec.dat <- do.call("rbind",samp.bm.tmp)
-bm.est.dat <- do.call("rbind",bm.est.tmp)
-rec.est.dat <- do.call("rbind",rec.est.tmp)
+surv.dat[[s]] <- do.call("rbind",surv.tmp)
+samp.bm.dat[[s]] <- do.call("rbind",samp.bm.tmp)
+samp.rec.dat[[s]] <- do.call("rbind",samp.bm.tmp)
+bm.est.dat[[s]] <- do.call("rbind",bm.est.tmp)
+rec.est.dat[[s]] <- do.call("rbind",rec.est.tmp)
 # Note that we can get negative values for the LCI because we are assuming the bm.per.tow is normally distributed.  These are truncated to 0's here...
 # There are way better ways to deal with this (e.g. log-normal, but that distro is a pain...)
-bm.est.dat$lci[bm.est.dat$lci <0] <- 0
-
+bm.est.dat[[s]]$lci[bm.est.dat$lci <0] <- 0
+} # end the Simulation Loop
 ```
 
-<!-- Now we have all our model inputs so we can run the Stock Assessment Model -->
-
+How long did it take to run the model?
 
 ```{r SA-model, echo=F,message=F, warning=F}
 
+#Now we have all our model inputs so we can run the Stock Assessment Model, note that we just run this on the 'first' simulated data set. 
+#This is simply done due to time constraints, we could easily modify this to run the most for all simulations, but that would take a while!
+
 # Get the model data into the format needed for the model
-mod.dat <- data.frame(I = bm.est.dat %>% dplyr::filter(metric == "Survey") %>% dplyr::select(biomass) %>% unname(), 
-                      IR = rec.est.dat %>% dplyr::filter(metric == "Survey") %>% dplyr::select(biomass) %>% unname(),
+mod.dat <- data.frame(I = bm.est.dat[[1]] %>% dplyr::filter(metric == "Survey") %>% dplyr::select(biomass) %>% unname(), 
+                      IR = rec.est.dat[[1]] %>% dplyr::filter(metric == "Survey") %>% dplyr::select(biomass) %>% unname(),
                       G = mod.actual$growth.adults,
                       GR = mod.actual$growth.recruits,
                       C = mod.actual$catch,
                       year = yrs)
 
-# Don't touch these...
+# For this assignment we don't touch these, but you certainly could explore these...
 r.prior = data.frame(a=rec.biomass,b=1000)
 b0.prior= data.frame(a=initial.biomass,b=0.5)
 
@@ -684,6 +686,35 @@ mod.res$recruits[nrow(mod.res)] <- NA
 
 ```
 
+So the first thing we want to look at is how well the survey indices for Biomass and Recruitment track the actual Biomass and Recruitment. To do this we need to account for the *catchability* of the stock in the survey. Since we *know* this value in this case we can create this plot to see how well our survey is capturing the underlying dynamics.  Each dashed blue-line is one realization.
+
+```{r survey-sims-plts,echo=F,message=F,warning=F,fig.width= 11, fig.height= 8,fig.cap = "Time series of the survey biomass index from each realization (dashed blue lines) and the actual q-corrected biomass (thick grey line) used for the simulation."}
+
+# First the adult biomass survey index time series
+bm.surv <- do.call('rbind',bm.est.dat)
+bm.surv <- bm.surv %>% dplyr::filter(metric == "Survey")
+bm.surv$simulation <- as.factor(bm.surv$simulation)
+# Now the recruitment survey index time series
+rec.surv <- do.call('rbind',rec.est.dat)
+rec.surv <- rec.surv %>% dplyr::filter(metric == "Survey")
+rec.surv$simulation <- as.factor(rec.surv$simulation)
+
+
+# So let's plot the model actual biomass (q-corrected) against the survey index
+bm.surv.plt <- ggplot(mod.actual)  + geom_line(aes(y=biomass*catchability.sims,x = years),size=1.5,color='darkgrey') +
+                                     geom_point(data = bm.surv, aes(y = biomass, x = years, group = simulation),color="blue") +
+                                     ylab("Adult Biomass Index")+ xlab("") + theme_bw()
+
+
+rec.surv.plt <- ggplot(mod.actual) + geom_line(aes(y=recruits*catchability.sims,x = years),size=1.5,color='darkgrey') + 
+                                     geom_point(data = rec.surv, aes(y = biomass, x = years, group = simulation),color="blue") +
+                                     ylab("Recruit biomass Index")+ xlab("") + theme_bw()
+
+surv.sims.plt <- plot_grid(bm.surv.plt,rec.surv.plt,nrow=1)
+surv.sims.plt
+```
+
+
 Priors are essentially a guide for the model to help inform likely values for the parameters. Sometimes they are well know (informative), sometimes they are not much more than an 'educated' guess.  In our example you should tweak the priors for catchability (*q*) and natural mortality (*m*) to see how these influence the estimate of both these parameters and the other parameters in the model.  You should be thinking *are their consequences to getting these wrong and if so what are they*.
 
 ```{r q-m-priors-posts,echo=F,message=F,warning=F,fig.cap = "The Prior and Posterior distributions for catchability and mortality.  The Prior distribution is approximated by the line, while the model realizations (aka Posteriors) are given by the histogram (bars). In the left figure, the blue dashed line is the catchability (q) you defined for the simulations, this is a fixed unchanging value.  In the figure on the right, the red dashed line is the average natural mortality (m) you defined, note that natural mortality varies each year in our simulations, but our Stock Assessment Model (SAM) is constrained to estimate one m for the entire time series. "}
@@ -698,12 +729,12 @@ m <- DD.out$median$M # Same as median(m.post$Posterior)
 # Here are the main output plots that should summarize everything that needs summarized for this
 plt.q <- ggplot(q.post) + geom_histogram(aes(Posterior),alpha = 0.5) + 
                           geom_freqpoly(aes(Prior)) + xlab("Catchability") + 
-                          geom_vline(aes(xintercept = catchability.sims),color='blue',size=1.,linetype = 'dashed')
+                          geom_vline(aes(xintercept = catchability.sims),color='blue',size=1.,linetype = 'dashed')+
                           ylab("") + theme_bw()
                           
 plt.m <- ggplot(m.post) + geom_histogram(aes(Posterior),alpha = 0.5) + 
                           geom_freqpoly(aes(Prior)) + xlab("Natural Mortality") + 
-                          geom_vline(aes(xintercept = mean.nat.mort.sims),color='firebrick2',size=1.,linetype = 'dashed')
+                          geom_vline(aes(xintercept = mean.nat.mort.sims),color='firebrick2',size=1.,linetype = 'dashed')+
                           ylab("") + theme_bw()
 
 post.plt <- plot_grid(plt.q,plt.m,nrow=1)
@@ -712,39 +743,84 @@ post.plt
 ```
 
 
-Here are two biomass figures.  The first is the q-corrected Model Estimated biomass compared to the survey biomass index.  The second is the Stock Assessment estimated biomass compared to the Actual simulated biomass. **Recall, the Actual simulated biomass would be 'unknown' in a real world Stock Assessment, here it is a check of how well our models have done**.  
+Here are two biomass figures.  The first is the q-corrected Model Estimated biomass compared to the survey biomass index.  The second is the Stock Assessment estimated biomass compared to the Actual simulated biomass. **Recall, the Actual simulated biomass would be 'unknown' in a real world Stock Assessment, here because we are just doing simulations we can use this as a check of how well our models have done**.  
 
-So how well is the Stock Assessment Model (SAM) doing at recreating the Survey Index?
+So how well is the Stock Assessment Model (SAM) doing at recreating the survey adult and recruit biomass indicies?
 
 
-```{r bm-plts,echo=F,message=F,warning=F,fig.cap = "The model biomass results compared to a) the survey index biomass, here we have q-corrected the Stock Assessment biomass (the grey line) and compared it to the Survey Biomass Index. In b) we have the Stock Assessment biomass (grey line) compared to the Actual Biomass that we simulated."}
+```{r bm-plts,echo=F,message=F,warning=F,fig.cap = "The SAM adult biomass results compared to a) the survey index adult biomass, here we have q-corrected the SAM adult biomass (the grey line) and compared it to the survey adult biomass index. In b) we have the SAM adult biomass (grey line) compared to the Actual Adult Biomass."}
 
-plt.SA.vs.SI.bm <- ggplot(mod.dat) + geom_line(data = mod.res,aes(y=biomass*q,x=years),size=1.5,color='darkgrey') +
+plt.SA.vs.SI.bm <- ggplot(mod.dat) + geom_line(data = mod.res,aes(y=biomass*catchability.sims,x=years),size=1.5,color='darkgrey') +
                                      geom_point(aes(x=year,y=I),size=1.5,color='blue') + 
-                                     xlab("")+ ylab("Biomass Index (tonnes)")
+                                     xlab("")+ ylab("Adult Biomass Index (tonnes)")
   
 plt.SA.vs.Act.bm <- ggplot(mod.actual) + geom_line(data = mod.res,aes(y=biomass,x=years),size=1.5,color='darkgrey') +
                                          geom_point(aes(x=years,y=biomass),size=1.5,color='blue') + 
-                                         xlab('') + ylab("Biomass (tonnes)") + theme_bw()
+                                         xlab('') + ylab("Adult Biomass (tonnes)") + theme_bw()
 bm.plts <- plot_grid(plt.SA.vs.SI.bm,plt.SA.vs.Act.bm,nrow=1)
 bm.plts
 
 ```
 
+```{r rec-plts,echo=F,message=F,warning=F,fig.cap = "The SAM recruit biomass results compared to a) the survey index recruit biomass, here we have q-corrected the SAM recruit biomass (the grey line) and compared it to the survey recruit biomass index. In b) we have the SAM recruit biomass (grey line) compared to the actual recruit Biomass."}
 
+plt.SA.vs.SI.rec <- ggplot(mod.dat) + geom_line(data = mod.res,aes(y=recruits*catchability.sims,x=years),size=1.5,color='darkgrey') +
+                                     geom_point(aes(x=year,y=IR),size=1.5,color='blue') + 
+                                     xlab("")+ ylab("Recruit Biomass Index (tonnes)")
+  
+plt.SA.vs.Act.rec <- ggplot(mod.actual) + geom_line(data = mod.res,aes(y=recruits,x=years),size=1.5,color='darkgrey') +
+                                         geom_point(aes(x=years,y=recruits),size=1.5,color='blue') + 
+                                         xlab('') + ylab("Recruit Biomass (tonnes)") + theme_bw()
 
-```{r under-construction}
-ggplot(mod.actual) + geom_line(aes(x=years,y=natural.mort),size=1.5,color='blue') + 
-                     geom_hline(aes(yintercept = DD.out$median$M),size=1.5,linetype='dashed',color='darkgrey') + theme_bw()
-  
-ggplot(mod.actual) + geom_line(data = mod.res,aes(y=biomass,x=years),size=1.5,color='darkgrey') +
-                     geom_point(aes(x=years,y=biomass),size=1.5,color='blue') + theme_bw()
-  
-ggplot(mod.actual) + geom_line(data = mod.res,aes(y=recruits,x=years),size=1.5,color='darkgrey') +
-                     geom_point(aes(x=years,y=recruits),size=1.5,color='blue') + 
-                     theme_bw()
-  
-ggplot(mod.actual) +  geom_line(data = mod.res,aes(y=exploitation.rate,x=years),size=1.5,color='darkgrey') + 
-                      geom_point(aes(x=years,y=exploitation.rate),size=1.5,color='blue') + 
-                      theme_bw()
+rec.plts <- plot_grid(plt.SA.vs.SI.rec,plt.SA.vs.Act.rec,nrow=1)
+rec.plts
+
 ```
+
+Next we can look at the actual natural mortality and compare it to the mean of our prior distribution.  *Hint* Think about how the variability in the actual natural mortality that isn't being captured in our model would impact the model results.
+
+```{r nat-mort-plt,echo=F,message=F,warning=F,fig.cap = "The actual natural mortality (blue line) time series, the grey dashed line is the median of the natural mortality parameter used in the SAM."}
+
+nat.mort.ts.plt <- ggplot(mod.actual) + geom_line(aes(x=years,y=natural.mort),size=1.5,color='blue') + 
+                                        geom_hline(aes(yintercept = DD.out$median$M),size=1.5,linetype='dashed',color='darkgrey') + 
+                                        ylab("Natural Mortality") + xlab("") + theme_bw()
+nat.mort.ts.plt
+```
+
+We can also explore how different the exploitation rate from the SAM model is to the actual exploitation rate.
+
+
+```{r exp-plt,echo=F,message=F,warning=F,fig.cap = "The SAM exploitation rate time series (grey line) compared to the actual exploitation rate (blue points)."}
+
+exp.plt <- ggplot(mod.actual) +  geom_line(data = mod.res,aes(y=exploitation.rate,x=years),size=1.5,color='darkgrey') + 
+                      geom_point(aes(x=years,y=exploitation.rate),size=1.5,color='blue') + 
+                      ylab("Exploitation") + xlab("") + theme_bw()
+exp.plt
+```
+
+
+
+# Terms and Jargon 
+
+*Important*: Pretty much all of these 'definitions' are simplifications that serve our purposes, but if you go deeper into Fisheries Science you will see that it is often much more complex than this.
+
+- *Adults:* Mature individuals that are targeted by the fishery
+- *Recruits:* Individuals that will mature and be targeted by the fishery next year
+- *Biomass:* The Abundance of individual in a certain size/age class multiplied by the weight of those indivduals.  Usually the weight is taken as some sort of average of the population
+- *Growth:* The increase in size (mass) of a class of fish in a given year
+
+- *Survey:* The process in which a stock is sampled to get an estimate of population status (e.g. abundance index) and life history parameters (e.g. growth)
+- *Survey Design:* The method used to carry our a survey.  For our purposes this includes the number of sampling stations and the type of stratification (if any) to use.
+- *Stratification:* A method used to divide up a survey into areas with 'similar' characteristics. If done properly it will reduce the uncertainty of your survey indices compared to a survey in which the stations are simply randomly allocated.
+
+- *Stock Assessment Model:* A model which uses data from a survey and/or fishery data to get metric(s) of population status (usually an estimate of stock biomass)
+- *Parameter:* An input to or output from a model, generally parameters are 'fixed' values (e.g catchability is a parameter).
+- *Variable:* An input to or output from a model, generally variables can vary (e.g. biomass is a variable).
+- *Prior:* Used to inform your model what the most likely range of values are for a particular parameter. This is a "Bayesian statistics" concept.  
+- *Catchability:* The proportion of the individuals in the area sampled that are captured by a survey tow 
+
+- *Natural Mortality:* The proportion of the population that dies from 'natural causes' in a given year.
+- *Exploitation:* The proportion of the population that is captured by the fishery in a given year.
+- *Simulation:* Process of using certain mathematical/statistical equations and tools to develop data and test the impact of varying inputs and assumptions on the end results. Stochastic simulations incorporate statistical uncertainty in model parameters to generate multiple outcomes by accounting for various types of uncertainty.
+- *Realizations:* When running a stochastic simulation a realization is one set of results, there can be many realizations.
+
