@@ -6,7 +6,7 @@
 1.  Install the program [[R](https://cran.r-project.org/)], there are options for Windows, Mac, and Linux users.  
 2.  Install the program [R-studio](https://www.rstudio.com/products/rstudio/download/#download).  Again there are options for Windows, Mac, and Linux users.  
 3.  Install the program [JAGS](https://sourceforge.net/projects/mcmc-jags/files/JAGS/4.x/), select version 4.3.  Again there are options for Windows, Mac, and Linux users.
-
+4. Install the program [RTools](https://cran.r-project.org/bin/windows/Rtools/rtools40.html) which is needed to install some R packages.
 
 ### Once you have these programs installed
 
@@ -20,7 +20,7 @@
 4.  If you already use R, still run the below code, it will skip over any packages you already have installed and simply install the packages you need for the course
 
 ```r
-req.packages <- c("tidyverse","dplyr","sf","units","cowplot","knitr",'ggthemes',"marmap","RandomFields","RCurl",'readr','s2','plotly',"ggplot2","stars","tmaptools","maptools","rnaturalearth","rnaturalearthdata","raster","rgdal","RStoolbox","pals","ggnewscale","ggspatial",'devtools','raster','bookdown','gridExtra','scales','matlab','R2jags','RandomFields')
+req.packages <- c("tidyverse","dplyr","sf","units","cowplot","knitr",'ggthemes',"marmap","RandomFields","RCurl",'readr','s2','plotly',"ggplot2","stars","tmaptools","maptools","rnaturalearth","rnaturalearthdata","raster","rgdal","RStoolbox","pals","ggnewscale","ggspatial",'devtools','raster','bookdown','gridExtra','scales','matlab','R2jags','zipfR','RandomFields')
 # If you don't have the packages install them + give a heads up that you are
 new.packages <- req.packages[!(req.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)>0) 

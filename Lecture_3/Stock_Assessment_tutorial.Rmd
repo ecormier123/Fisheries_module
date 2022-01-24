@@ -113,7 +113,7 @@ surv.dist <- "NAFO" # This is a stratified survey using NAFO boundaries as the s
 
 # As with Lecture 2, we can repeated sample the area to understand how changing the above impacts our survey index estimates of the actual Simulated Biomass
 # As with Tutorial #2, I suggest you try 1,5, and 25 realizations (go get a coffee when you run 25 times!)
-n.realizations <- 25
+n.realizations <- 1
 
 # Parameters to tweak for the Delay Difference Stock Assessment Model (SAM)
 
