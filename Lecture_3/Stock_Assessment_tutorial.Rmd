@@ -113,16 +113,16 @@ vii.  Press the "Knit" button in the tool bar
 ```{r user-inputs, echo=F,message=F, warning=F}
 
 # You can set the number of stations...
-n.tows <- 20
+n.tows <- 5
 
 # How do you want to set up the survey, Random Stratified or NAFO stratified
 #Just comment and uncomment to shift between the options
-#surv.dist <-"Random" # This is a random survey
-surv.dist <- "NAFO" # This is a stratified survey using NAFO boundaries as the stratification scheme
+surv.dist <-"Random" # This is a random survey
+#surv.dist <- "NAFO" # This is a stratified survey using NAFO boundaries as the stratification scheme
 
 # As with Lecture 2, we can repeated sample the area to understand how changing the above impacts our survey index estimates of the actual Simulated Biomass
 # As with Tutorial #2, I suggest you try 1,5, and 25 realizations (go get a coffee when you run 25 times!)
-n.realizations <- 2
+n.realizations <- 25
 
 # Parameters to tweak for the Delay Difference Stock Assessment Model (SAM)
 
