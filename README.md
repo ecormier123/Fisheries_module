@@ -6,7 +6,7 @@
 1.  Install the program [[R](https://cran.r-project.org/)], there are options for Windows, Mac, and Linux users.  
 2.  Install the program [R-studio](https://www.rstudio.com/products/rstudio/download/#download).  Again there are options for Windows, Mac, and Linux users.  
 3.  Install the program [JAGS](https://sourceforge.net/projects/mcmc-jags/files/JAGS/4.x/), select version 4.3.  Again there are options for Windows, Mac, and Linux users.
-4. Install the program [RTools](https://cran.r-project.org/bin/windows/Rtools/rtools40.html) which is needed to install some R packages.
+4. *If using Windows* install the program [RTools](https://cran.r-project.org/bin/windows/Rtools/rtools40.html) which is needed to install some R packages. This should not be necessary if using a Mac or Linux OS.
 
 ### Once you have these programs installed
 
