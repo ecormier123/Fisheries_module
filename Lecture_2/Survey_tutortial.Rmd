@@ -26,8 +26,8 @@ header-includes:
 ---
 
 # Survey Tutorial Project Outline
-A.  Your job is to design an annual trawl survey for Dusky Scallop Shark (*Dustious maximus*; Figure \@ref(fig:nafo-plt)). The survey occurs June when the stock is spawning.
-B.  The stock area shown has been chosen as a compromise between the stock biology, stakeholder input, and operational constraints (Figure \@ref(fig:base-plt)(.
+A.  Your job is to design an annual trawl survey for Dusky Scallop Shark (*Dustious maximus*; Figure \@ref(fig:base-plt)). The survey occurs June when the stock is spawning.
+B.  The stock area shown has been chosen as a compromise between the stock biology, stakeholder input, and operational constraints (Figure \@ref(fig:base-plt)).
 C.  In planning your survey there are 2 variables you can control
     a. You can vary the number of survey tows
        - From start to finish it takes approximately 3 hours to complete a tow and finish the scientific analyses
@@ -68,10 +68,10 @@ D.  You can also 'simulate' different biomass distributions to see if this chang
 # The Tutorial Tutorial
 
 i.    Open the file "Survey_tutorial.Rmd" in R-Studio
-ii.   On line 89 of this file you can change the number of tows used in the survey.  Default is 20 tows
-iii.  On lines 95-97 of this file you can change the underlying biomass distribution
+ii.   On line 83 of this file you can change the number of tows used in the survey.  Default is 20 tows
+iii.  On lines 86-88 of this file you can change the underlying biomass distribution
       - To do this you add a # symbol at the start of the lines you do not want, and removed it from the line you do want
-iv.   You can change the number of realizations run on line 100.
+iv.   You can change the number of realizations run on line 94
       - I suggest trying 1, 5, and 250 (this will be slow!) to see if/how your opinion changes with more realizations of your data.
 v.    Press the "Knit" button in the tool bar 
       - Make sure that you closed (and saved if you want to keep the results) the word document.
@@ -80,18 +80,18 @@ v.    Press the "Knit" button in the tool bar
 
 ```{r survey-inputs, echo=F}
 # You can set the number of stations...
-n.tows <- 20
+n.tows <- 199
 
 # This sets up how the biomass is distributed through the region.
 bm.dist <- c("Random","NAFO","Depth") 
 # Which Biomass distribution do you want [1] will be Random Survey, 2 will be NAFO survey, and 3 will be "Depth
 # Just comment and uncomment to shift between the options
-#bm.dist <- bm.dist[1] # This is biomass distributed randomly throughout the region
-bm.dist <- bm.dist[2] # This makes the biomass distribution be a function of the NAFO strata
+bm.dist <- bm.dist[1] # This is biomass distributed randomly throughout the region
+#bm.dist <- bm.dist[2] # This makes the biomass distribution be a function of the NAFO strata
 #bm.dist <- bm.dist[3] # This makes the biomass distribution being a function of depth
 
 # This changes the number of realizations you run, I suggest trying 1, 4, and 250 (250 will be slow!) to see if it changes your opinion
-n.realizations <- 4
+n.realizations <- 200
 
 ```
 
@@ -330,12 +330,11 @@ expect.survey.bm <- tot.biomass*catchability # This is what the biomass from the
 
 
 # Let's get all the parameters formatted nicely for a table so we can see them
-parameters <- data.frame(Parameter = c("Number of Tows ", "Biomass distribution",
-                                       "Total Biomass", "Catchability","Area swept by a tow",
-                                       "Number of Realizations"),
+parameters <- data.frame(Parameter = c("Number of Tows ", "Biomass",
+                                       "Catchability","Area swept by a tow","Number of Realizations","Biomass Distribution"),
                          Value     = c(     n.tows  ,    paste(tot.biomass, 'tonnes')  , 
                                             catchability , paste(area.swept.m,"m²"),
-                                            n.realizations ,              bm.dist))
+                                            n.realizations , bm.dist))
 
 knitr::kable(parameters,booktabs=T, caption = "A Table of your input values for the current run of your simulation")
 
