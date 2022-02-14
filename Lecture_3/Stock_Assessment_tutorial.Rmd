@@ -82,18 +82,13 @@ D.  The survey indices will then be used as the inputs into the Delay Difference
         
 # Questions to Consider
 
-1. How well does the survey index compare to the 'actual biomass'?    
-   - Does changing the number of survey stations or the stratification (NAFO vs Random) influence this?
-   - Given these results and your experience from Lecture 2, would you recommend the NAFO or Random survey?
-   - How many stations would you recommend?
-   
-2. How well does the Biomass form the SAM compare to the 'actual biomass'?
+1. How well does the Biomass form the SAM compare to the 'actual biomass'?
 
-3. How does varying the prior on the catchability impact the Stock Assessment results?
+2. How does varying the prior on the catchability impact the Stock Assessment results?
    - What are the consequences of being wrong about catchability?
-4. How does varying the prior on natural mortality impact the Stock Assessment results?
+3. How does varying the prior on natural mortality impact the Stock Assessment results?
    - What are the consequences of being wrong about natural mortality?
-5. How do you think having a fixed natural mortality term is impacting the Stock Assessment results?
+4. How do you think having a fixed natural mortality term is impacting the Stock Assessment results?
 
 # The Tutorial Tutorial
 
@@ -113,7 +108,7 @@ vii.  Press the "Knit" button in the tool bar
 ```{r user-inputs, echo=F,message=F, warning=F}
 
 # You can set the number of stations...
-n.tows <- 5
+n.tows <- 200
 
 # How do you want to set up the survey, Random Stratified or NAFO stratified
 #Just comment and uncomment to shift between the options
@@ -127,16 +122,16 @@ n.realizations <- 25
 # Parameters to tweak for the Delay Difference Stock Assessment Model (SAM)
 
 # Set your priors for q and m, you will get a plot showing the properties of this prior in the output. 
-q.prior <- data.frame(a=15,b=35) # q = catchability
+q.prior <- data.frame(a=15,b=35) # q = catchability, very close to 0.3
 #q.prior <- data.frame(a=45,b=35) # Here is an alternative you can try for catchability prior, this gives a median q of around 0.55
-m.prior <- data.frame(a=7,b=55) # m = natural mortality (proportional scale, I'm using M to be instantaneous rate)
-#m.prior <- data.frame(a=40,b=55) # Here is an  alternative you can try for the natural mortality prior, this gives a median m of around 0.44.
+#m.prior <- data.frame(a=14,b=55) # m = natural mortality (proportional scale, I'm using M to be instantaneous rate). Very close to 0.2
+m.prior <- data.frame(a=40,b=55) # Here is an  alternative you can try for the natural mortality prior, this gives a median m of around 0.44.
 # Quick guide... if a < b your median for the prior will be < 0.5, if a = b it'll be around 0.5, if a > b it'll be > 0.5
 # the a/b ratio controls distance from 0.5.  
 # The size of a and b controls the width of the distributions, if a and b are low you get a very wide distributions
 # If a and b are high you get more narrow distributions.  
 #Play around with this command to experiment with different shapes of the beta distribution if interested
-#hist(rbeta(10000,40,55))
+#hist(rbeta(10000,15,35))
 
 
 ```
@@ -159,7 +154,7 @@ rec.biomass <- 30000 # This is approximately the average number of recruits over
 # changing this won't really do anything other than rescale the biomass per tow and survey biomass estimates.
 catchability.sims <- catchability <- 0.3 # What proportion of the population does survey tend to catch, we fix this value in the simulations as a single value that doesn't change over time.
 
-mean.nat.mort.sims <- m.mn   <- 0.2 # What is the average natural mortality for the population, the acutal (simulated) natural mortality varies each year in the simulations, but in our Stock Assessment Model we assume that natural mortality doesn't vary over time, so there is only 1 model estimate for natural mortality
+mean.nat.mort.sims <- m.mn   <- 0.2 # What is the average natural mortality for the population, the actual (simulated) natural mortality varies each year in the simulations, but in our Stock Assessment Model we assume that natural mortality doesn't vary over time, so there is only 1 model estimate for natural mortality
 
 # This is for the stock assessment model itself
 niter <- 20000 # If it is taking a long time for your models to run you can reduce this number, 20000 gives good results and runs in < 20 seconds on a tricked out laptop.
@@ -909,7 +904,7 @@ knitr::kable(rec.tab.res,booktabs=T, caption = "A Table showing how well SAM rec
 
 Next we can look at the actual natural mortality and compare it to the mean of our prior distribution.  *Hint* Think about how the variability in the actual natural mortality that isn't being captured in our model would impact the model results.
 
-```{r nat-mort-plt,echo=F,message=F,warning=F,fig.cap = "The actual natural mortality (blue line) time series, the grey dashed line is the median of the natural mortality parameter used in the SAM."}
+```{r nat-mort-plt,echo=F,message=F,warning=F,fig.cap = "The actual natural mortality (blue line) time series, the grey dashed line is the median of the natural mortality estimate from the SAM."}
 
 nat.mort.ts.plt <- ggplot(mod.actual) + geom_line(aes(x=years,y=natural.mort),size=1.5,color='blue') + 
                                         geom_hline(aes(yintercept = DD.out$median$M),size=1.5,linetype='dashed',color='darkgrey') + 
