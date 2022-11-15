@@ -245,8 +245,8 @@ bathy <- marmap::as.raster(bathy.org)
 b.box <- st_bbox(survey.domain)
 # Now clip this to the bounding area, note that the bathy is basically a EPSG:4326 so we need to crop it accordingly and transform our b.box to this...
 bathy.s <- crop(bathy,b.box)
-bathy.st <- st_as_stars(bathy.s)
-bathy.poly <- st_as_sf(bathy.st)
+bathy.st <- st_as_stars(bathy)
+bathy.polygon <- st_as_sf(bathy.st)
 # Make anything > 0 = 0, and anything < 250 = 250.  Our species won't go below 250 meters depth nor is it an amphibian
 bathy.poly$layer[bathy.poly$layer > 0] <- 0
 bathy.poly$layer[bathy.poly$layer < -250] <- -250

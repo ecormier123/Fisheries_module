@@ -93,11 +93,11 @@ D.  The survey indices will then be used as the inputs into the Delay Difference
 # The Tutorial Tutorial
 
 i.    Open the file "Stock_Assessment_tutorial.Rmd" in R-Studio
-ii.   On line XX of this file you can change the number of tows used in the survey.  Default is 20 tows
-iii.  On line XX-YY of this file you can change the survey stratification scheme, options are "Random" and "NAFO"
-iv.   On line XX of this file you can change the number of times you simulate the Biomass time series and subsequent survey sampling
-v.    On line XX of this file you can change the *Catchability Prior* to see how this influences the SAM results
-vi.   On line XX of this file you can chnage the *Natural mortality Prior* to see how this influences the SAM results
+ii.   On line 111 of this file you can change the number of tows used in the survey.  Default is 20 tows
+iii.  On line 115 of this file you can change the survey stratification scheme, options are "Random" and "NAFO"
+iv.   On line 120 of this file you can change the number of times you simulate the Biomass time series and subsequent survey sampling
+v.    On line 125 of this file you can change the *Catchability Prior* to see how this influences the SAM results
+vi.   On line 128 of this file you can chnage the *Natural mortality Prior* to see how this influences the SAM results
 vii.  Press the "Knit" button in the tool bar 
       - Make sure that you closed (and saved if you want to keep the results) the word document.
 
@@ -339,8 +339,8 @@ gmrfs.sf$years <- gmrfs@coords[,3]
 st_crs(gmrfs.sf) <- 4326
 rec.gmrfs.sf$years <- rec.gmrfs@coords[,3]
 st_crs(rec.gmrfs.sf) <- 4326
-# ggplot(gmrfs.sf) + geom_sf(aes(fill = variable1,color=variable1),size=3) + scale_fill_viridis_b() + scale_color_viridis_b() + facet_wrap(~years)
-# ggplot(rec.gmrfs.sf) + geom_sf(aes(fill = variable1,color=variable1),size=3) + scale_fill_viridis_b() + scale_color_viridis_b() + facet_wrap(~years)
+ggplot(gmrfs.sf) + geom_sf(aes(fill = variable1,color=variable1),size=3) + scale_fill_viridis_b() + scale_color_viridis_b() + facet_wrap(~years)
+ggplot(rec.gmrfs.sf) + geom_sf(aes(fill = variable1,color=variable1),size=3) + scale_fill_viridis_b() + scale_color_viridis_b() + facet_wrap(~years)
 ```
 
 
@@ -617,9 +617,9 @@ for(i in 1:n.years)
     # This is biomass in KG at the moment, just to make it make more sense.  Note the order of magnitude difference between the size of the stock and how many
     # are caught in this survey
     samp.rec.tmp[[i]]$sample.bm <- rlnorm(n.tows,log(catchability*  samp.rec.tmp[[i]]$bm.dens*area.swept*1000),0.25)
-    # ggplot() + geom_sf(data = rand.samp.dat, aes(fill = sample.bm,color=sample.bm)) + 
-    #            geom_sf(data=survey.domain, fill = NA) +
-    #            scale_fill_viridis_b() + scale_color_viridis_b()
+    ggplot() + geom_sf(data = rand.samp.dat, aes(fill = sample.bm,color=sample.bm)) + 
+               geom_sf(data=survey.domain, fill = NA) +
+               scale_fill_viridis_b() + scale_color_viridis_b()
     
     # Now from here we use standard survey math to get a survey estimated biomass.  Steal from Stephens Simple survey code because i know that is done right :-)
     # The basic calculations for this are very straightforward, the average biomass per tow along with uncertainies
